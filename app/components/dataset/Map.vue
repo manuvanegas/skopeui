@@ -94,7 +94,15 @@
     <!-- map -->
     <v-card-text class="map">
       <client-only placeholder="Loading map, please wait...">
-        <l-map ref="layerMap" :min-zoom="2" @ready="mapReady">
+        <l-map
+          ref="layerMap"
+          :zoom="6"
+          :center="[37, -108]"
+          :min-zoom="2"
+          style="height: 100%; width: 100%"
+          @l-ready="mapReady"
+          @ready="mapReady"
+        >
           <l-tile-layer
             v-for="provider of leafletProviders"
             :key="provider.name"
@@ -115,21 +123,7 @@
             position="topright"
           />
           <template v-if="displayRaster">
-            <l-wms-tile-layer
-              v-for="v of variables"
-              ref="wmsLayers"
-              :key="v.id"
-              :base-url="skopeWmsUrl"
-              :layers="fillTemplateYear(v.wmsLayer)"
-              :name="v.name"
-              :crs="defaultCrs"
-              :transparent="true"
-              :opacity="layerOpacity"
-              layer-type="overlay"
-              :visible="v.visible"
-              version="1.3.0"
-              format="image/png"
-            />
+            <l-layer-group ref="rasterLayerGroup" layer-type="overlay" />
           </template>
           <l-control-scale position="bottomright" />
         </l-map>
@@ -141,10 +135,7 @@
 <script>
 import Vue from "vue";
 import { Component, Prop, Watch } from "nuxt-property-decorator";
-import {
-  LEAFLET_PROVIDERS,
-  SKOPE_WMS_ENDPOINT,
-} from "@/store/modules/constants";
+import { LEAFLET_PROVIDERS } from "@/store/modules/constants";
 import circleToPolygon from "circle-to-polygon";
 import { stringify } from "query-string";
 import {
@@ -183,6 +174,7 @@ class Map extends Vue {
   legendControl = null;
   legendPosition = "bottomleft";
   geoJsonWatcher = null;
+  georasterLayers = {};
 
   get areaStyle() {
     return {
@@ -224,8 +216,8 @@ class Map extends Vue {
     return this.opacity / 100.0;
   }
 
-  get skopeWmsUrl() {
-    return SKOPE_WMS_ENDPOINT;
+  get cogBasePath() {
+    return "/data";
   }
 
   get leafletProviders() {
@@ -254,9 +246,80 @@ class Map extends Vue {
   get variables() {
     return this.metadata.variables;
   }
+  async initGeoRasterLayers() {
+    if (!this.displayRaster || !this.$refs.rasterLayerGroup) return;
 
-  get wmsLayer() {
-    return this.fillTemplateYear(this.variable.wmsLayer);
+    for (const v of this.variables) {
+      await this.loadCogLayer(v);
+    }
+  }
+
+  async loadCogLayer(variable) {
+    try {
+      const map = this.$refs.layerMap.mapObject;
+      const baseUrl =
+        typeof window !== "undefined" ? window.location.origin : "";
+      const cogUrl = `${baseUrl}${this.cogBasePath}/${variable.id}.tif`;
+      // Ensure L is available for the georaster plugin
+      window.L = window.L || this.$L;
+      // Dynamic imports
+      const georasterModule = await import("georaster");
+      const parseGeoraster = georasterModule.default || georasterModule;
+      const layerModule = await import(
+        "georaster-layer-for-leaflet/georaster-layer-for-leaflet.browserify.min.js"
+      );
+      let GeoRasterLayer = layerModule.default || layerModule;
+      if (
+        typeof GeoRasterLayer !== "function" &&
+        typeof window !== "undefined" &&
+        window.GeoRasterLayer
+      ) {
+        GeoRasterLayer = window.GeoRasterLayer;
+      }
+      map.setView([37, -108], 14); // using a zoomed view because (tile interleaved) COG loading and rendering can be slow
+
+      const georaster = await parseGeoraster(cogUrl);
+      // const bandIndex = this.getBandNumber(variable);
+      const bandIndex = 0; // TODO HARDCODE for testing
+
+      const layer = new GeoRasterLayer({
+        georaster,
+        opacity: this.layerOpacity,
+        resolution: 32, // 256 was too much for my case
+
+        pixelValuesToColorFn: (values) => {
+          const pixelValue = values[bandIndex];
+          // Don't render empty/no-data pixels
+          if (
+            pixelValue === georaster.noDataValue ||
+            pixelValue === undefined ||
+            isNaN(pixelValue)
+          ) {
+            return null;
+          }
+          // TODO: Replace this with an actual color scale
+          return "#ff0000";
+        },
+      }).addTo(map);
+
+      if (!this.nonReactiveGeoLayers) {
+        this.nonReactiveGeoLayers = {};
+      }
+      this.nonReactiveGeoLayers[variable.id] = layer;
+      console.log(`Loaded COG layer: ${variable.id}, band index: ${bandIndex}`);
+    } catch (error) {
+      console.error(`Failed to load COG for ${variable.id}:`, error);
+    }
+  }
+
+  getBandNumber(variable) {
+    const year = parseInt(this.year || this.$api().dataset.temporalRangeMax);
+    // TODO: figure out if the offset below is needed
+    // const offset = variable.timespan?.period?.gte;
+    // if (offset) {
+    //   return year - parseInt(offset);
+    // }
+    return year;
   }
 
   destroyed() {
@@ -290,6 +353,9 @@ class Map extends Vue {
     this.addDrawToolbar(map);
     initializeDatasetGeoJson(this.$warehouse, this.$api());
     this.registerToolbarHandlers(map);
+    this.$nextTick(() => {
+      this.initGeoRasterLayers();
+    });
     this.geoJsonWatcher = this.$watch(
       "geoJson",
       function (geoJson) {
@@ -304,7 +370,6 @@ class Map extends Vue {
     );
     this.isMapReady = true;
     this.$emit("mapReady", true);
-    this.updateWmsLegend();
   }
 
   addDrawToolbar(map) {
@@ -451,70 +516,35 @@ class Map extends Vue {
     this.legendImage = htmlElement;
   }
 
-  generateWmsLegendUrl() {
-    const query = {
-      REQUEST: "GetLegendGraphic",
-      VERSION: "1.0.0",
-      FORMAT: "image/png",
-      LAYER: this.wmsLayer,
-      ENV: `opacity:${this.layerOpacity}`,
-      LEGEND_OPTIONS: "layout:vertical;dx:10",
-    };
-    const queryString = stringify(query);
-    const legendUrl = this.skopeWmsUrl + queryString;
-    return legendUrl;
-  }
-
   @Watch("year")
-  updateWmsLayer() {
-    // hairy bit of code to:
-    // 1. pull out the currently selected layer's layer template string
-    // 2. update it with the current year
-    // 3. reset the params on the currently selected layer to request the new layer from GeoServer
-    if (this.variable !== null && this.$refs.wmsLayers) {
-      for (const wmsLayerRef of this.$refs.wmsLayers) {
-        if (wmsLayerRef.name === this.variable.name) {
-          const wmsLayer = wmsLayerRef.mapObject;
-          wmsLayer.setParams({ layers: this.wmsLayer }, false);
+  async onYearChange() {
+    Object.entries(this.georasterLayers).forEach(([varId, layer]) => {
+      if (layer) {
+        const variable = this.variables.find((v) => v.id === varId);
+        if (variable) {
+          layer.setBand(this.getBandNumber(variable));
         }
       }
-    }
-  }
-
-  @Watch("variable", { immediate: true, deep: true })
-  @Watch("layerOpacity")
-  updateWmsLegend() {
-    if (!this.isMapReady) {
-      return;
-    }
-    const map = this.$refs.layerMap.mapObject;
-    const L = this.$L;
-    const wmsLegendUrl = this.generateWmsLegendUrl();
-    if (_.isNil(this.legendControl) && this.currentStep == 2) {
-      const legend = L.control({ position: this.legendPosition });
-      legend.onAdd = (map) => {
-        const controlCss = "leaflet-control-wms-legend";
-        const legendCss = "wms-legend";
-        const div = L.DomUtil.create("div", controlCss);
-        const legendImage = L.DomUtil.create("img", legendCss, div);
-        legendImage.src = wmsLegendUrl;
-        this.setLegendImage(legendImage);
-        return div;
-      };
-      legend.addTo(map);
-      this.legendControl = legend;
-    }
-    if (this.legendImage !== null) {
-      this.legendImage.src = wmsLegendUrl;
-    }
-  }
-
-  fillTemplateYear(templateString) {
-    const year = (this.year || this.$api().dataset.temporalRangeMax).toString();
-    const layer = fillTemplate(templateString, {
-      year: year.padStart(4, "0"),
     });
-    return layer;
+  }
+
+  @Watch("layerOpacity")
+  onOpacityChange() {
+    Object.values(this.georasterLayers).forEach((layer) => {
+      if (layer) layer.setOpacity(this.layerOpacity);
+    });
+  }
+
+  @Watch("variables", { deep: true })
+  async onVariablesChange() {
+    // Clean up old layers
+    Object.values(this.georasterLayers).forEach((layer) => layer?.remove());
+    this.georasterLayers = {};
+
+    // Reload visible layers
+    if (this.isMapReady) {
+      await this.initGeoRasterLayers();
+    }
   }
 
   isSkopeLayer(leafletLayer) {
