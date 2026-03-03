@@ -4,7 +4,7 @@ services:
     volumes:
       - ./app:/code
       - /code/node_modules
-      - ./data.nosync:/code/static/data
+      - ../uidata.nosync:/code/static/data
     ports:
       - "127.0.0.1:3000:3000"
     command: >-

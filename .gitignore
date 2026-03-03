@@ -1,5 +1,5 @@
 .DS_Store
-data.nosync
+*.tif
 # backups
 *~
 # docker generated things
