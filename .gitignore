@@ -1,3 +1,5 @@
+.DS_Store
+*.tif
 # backups
 *~
 # docker generated things
