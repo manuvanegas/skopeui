@@ -4,3 +4,7 @@ services:
     build: app
     restart: always
     image: openskope/skopeui:latest
+
+  titiler:
+    image: ghcr.io/developmentseed/titiler:latest
+    restart: always

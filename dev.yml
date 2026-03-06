@@ -8,3 +8,9 @@ services:
       - "127.0.0.1:3000:3000"
     command: >-
       sh -c "yarn install && yarn dev"
+
+  titiler:
+    ports:
+      - "8000:80"
+    volumes:
+      - ../uidata.nosync:/data

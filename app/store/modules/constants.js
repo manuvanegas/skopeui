@@ -2,6 +2,7 @@ import { find } from "lodash";
 import {
   API_HOST_URL,
   GEOSERVER_HOST_URL,
+  TITILER_HOST_URL,
   BUILD_ID,
 } from "@/store/modules/_constants";
 import { toISODate } from "@/store/stats";
@@ -12,6 +13,7 @@ export const DEFAULT_MAX_PROCESSING_TIME = 10000; // in ms
 export const SKOPE_WMS_ENDPOINT = `${GEOSERVER_HOST_URL}/${WMS_SERVER_URI}`;
 export const TIMESERIES_ENDPOINT = `${API_HOST_URL}/timeseries`;
 export const METADATA_ENDPOINT = `${API_HOST_URL}/metadata`;
+export const TITILER_ENDPOINT = `${TITILER_HOST_URL}`;
 export const LEAFLET_PROVIDERS = [
   {
     name: "CartoDB.Positron",

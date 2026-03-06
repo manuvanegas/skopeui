@@ -115,21 +115,7 @@
             position="topright"
           />
           <template v-if="displayRaster">
-            <l-wms-tile-layer
-              v-for="v of variables"
-              ref="wmsLayers"
-              :key="v.id"
-              :base-url="skopeWmsUrl"
-              :layers="fillTemplateYear(v.wmsLayer)"
-              :name="v.name"
-              :crs="defaultCrs"
-              :transparent="true"
-              :opacity="layerOpacity"
-              layer-type="overlay"
-              :visible="v.visible"
-              version="1.3.0"
-              format="image/png"
-            />
+            <l-layer-group ref="rasterLayerGroup" layer-type="overlay" />
           </template>
           <l-control-scale position="bottomright" />
         </l-map>
@@ -143,6 +129,7 @@ import Vue from "vue";
 import { Component, Prop, Watch } from "nuxt-property-decorator";
 import {
   LEAFLET_PROVIDERS,
+  TITILER_ENDPOINT,
   SKOPE_WMS_ENDPOINT,
 } from "@/store/modules/constants";
 import circleToPolygon from "circle-to-polygon";
@@ -183,6 +170,7 @@ class Map extends Vue {
   legendControl = null;
   legendPosition = "bottomleft";
   geoJsonWatcher = null;
+  cogLayers = {};
 
   get areaStyle() {
     return {
@@ -222,10 +210,6 @@ class Map extends Vue {
 
   get layerOpacity() {
     return this.opacity / 100.0;
-  }
-
-  get skopeWmsUrl() {
-    return SKOPE_WMS_ENDPOINT;
   }
 
   get leafletProviders() {
@@ -276,6 +260,62 @@ class Map extends Vue {
     this.opacity = _.clamp(this.opacity + 10, 0, 100);
   }
 
+  getBandNumber(variable) {
+    const dataset = this.$api().dataset;
+    const year = parseInt(this.year || dataset.temporalRangeMax);
+    const offset = dataset.temporalRangeMin;
+
+    if (offset) {
+      return year - parseInt(offset) + 1;
+    }
+    return year;
+  }
+
+  getCogUrl(variable) {
+    return `file:///data/${variable.id}.tif`;
+    // FUTURE S3?:
+    // return `s3://paleocar_v3/data/${variable.id}.tif`;
+  }
+
+  getTileUrl(variable) {
+    const cogUrl = this.getCogUrl(variable);
+    const bandIndex = this.getBandNumber(variable);
+    const titilerUrl = TITILER_ENDPOINT;
+
+    return `${titilerUrl}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}?url=${encodeURIComponent(
+      cogUrl
+    )}&bidx=${bandIndex}&colormap_name=viridis&nodata=65535&rescale=0,1500`;
+  }
+
+  // Debounce the initCogLayers method to prevent initial spurious call when the map is first loading
+  debouncedInitCogLayers = _.debounce(function () {
+    this.initCogLayers();
+  }, 150);
+
+  async initCogLayers() {
+    if (!this.displayRaster || !this.$refs.rasterLayerGroup || !this.variable)
+      return;
+
+    this.loadCogLayer(this.variable);
+  }
+
+  loadCogLayer(variable) {
+    try {
+      const map = this.$refs.layerMap.mapObject;
+      const tileUrl = this.getTileUrl(variable);
+
+      const layer = L.tileLayer(tileUrl, {
+        opacity: this.layerOpacity,
+        maxZoom: 20,
+      }).addTo(map);
+
+      this.cogLayers[variable.id] = layer;
+      console.log(`Loaded Titiler layer: ${variable.id}`);
+    } catch (error) {
+      console.error(`Failed to load Titiler layer for ${variable.id}:`, error);
+    }
+  }
+
   mapReady(map) {
     const handler = (event) => {
       const leafletLayer = event.layer;
@@ -290,6 +330,9 @@ class Map extends Vue {
     this.addDrawToolbar(map);
     initializeDatasetGeoJson(this.$warehouse, this.$api());
     this.registerToolbarHandlers(map);
+    this.$nextTick(() => {
+      this.debouncedInitCogLayers();
+    });
     this.geoJsonWatcher = this.$watch(
       "geoJson",
       function (geoJson) {
@@ -304,7 +347,7 @@ class Map extends Vue {
     );
     this.isMapReady = true;
     this.$emit("mapReady", true);
-    this.updateWmsLegend();
+    // this.updateWmsLegend();
   }
 
   addDrawToolbar(map) {
@@ -451,61 +494,56 @@ class Map extends Vue {
     this.legendImage = htmlElement;
   }
 
-  generateWmsLegendUrl() {
-    const query = {
-      REQUEST: "GetLegendGraphic",
-      VERSION: "1.0.0",
-      FORMAT: "image/png",
-      LAYER: this.wmsLayer,
-      ENV: `opacity:${this.layerOpacity}`,
-      LEGEND_OPTIONS: "layout:vertical;dx:10",
-    };
-    const queryString = stringify(query);
-    const legendUrl = this.skopeWmsUrl + queryString;
-    return legendUrl;
-  }
-
   @Watch("year")
-  updateWmsLayer() {
-    // hairy bit of code to:
-    // 1. pull out the currently selected layer's layer template string
-    // 2. update it with the current year
-    // 3. reset the params on the currently selected layer to request the new layer from GeoServer
-    if (this.variable !== null && this.$refs.wmsLayers) {
-      for (const wmsLayerRef of this.$refs.wmsLayers) {
-        if (wmsLayerRef.name === this.variable.name) {
-          const wmsLayer = wmsLayerRef.mapObject;
-          wmsLayer.setParams({ layers: this.wmsLayer }, false);
-        }
-      }
+  async onYearChange() {
+    if (!this.variable) return;
+
+    const activeLayer = this.cogLayers[this.variable.id];
+    if (activeLayer) {
+      const newTileUrl = this.getTileUrl(this.variable);
+      activeLayer.setUrl(newTileUrl);
     }
   }
 
-  @Watch("variable", { immediate: true, deep: true })
   @Watch("layerOpacity")
-  updateWmsLegend() {
-    if (!this.isMapReady) {
-      return;
-    }
+  onOpacityChange() {
+    Object.values(this.cogLayers).forEach((layer) => {
+      if (layer) layer.setOpacity(this.layerOpacity);
+    });
+  }
+
+  // Watch for changes to active variable within dataset and update map layers accordingly
+  @Watch("variable", { deep: true })
+  onActiveVariableChange(newVar, oldVar) {
+    if (!this.isMapReady || !newVar) return;
     const map = this.$refs.layerMap.mapObject;
-    const L = this.$L;
-    const wmsLegendUrl = this.generateWmsLegendUrl();
-    if (_.isNil(this.legendControl) && this.currentStep == 2) {
-      const legend = L.control({ position: this.legendPosition });
-      legend.onAdd = (map) => {
-        const controlCss = "leaflet-control-wms-legend";
-        const legendCss = "wms-legend";
-        const div = L.DomUtil.create("div", controlCss);
-        const legendImage = L.DomUtil.create("img", legendCss, div);
-        legendImage.src = wmsLegendUrl;
-        this.setLegendImage(legendImage);
-        return div;
-      };
-      legend.addTo(map);
-      this.legendControl = legend;
+
+    // 1. Hide the old variable from the map
+    if (oldVar && this.cogLayers[oldVar.id]) {
+      map.removeLayer(this.cogLayers[oldVar.id]);
     }
-    if (this.legendImage !== null) {
-      this.legendImage.src = wmsLegendUrl;
+
+    // 2. Load or show the newly selected variable
+    if (!this.cogLayers[newVar.id]) {
+      // It has never been loaded, so initialize it
+      this.loadCogLayer(newVar);
+    } else {
+      // It's already in our cache! Just put it back on the map and ensure the year is current
+      this.cogLayers[newVar.id].addTo(map);
+      this.cogLayers[newVar.id].setUrl(this.getTileUrl(newVar));
+    }
+  }
+
+  // Watch for changes to the dataset
+  @Watch("variables", { deep: true })
+  async onVariablesChange() {
+    // Clean up old layers
+    Object.values(this.cogLayers).forEach((layer) => layer?.remove());
+    this.cogLayers = {};
+
+    // Reload visible layers
+    if (this.isMapReady) {
+      this.debouncedInitCogLayers();
     }
   }
 
