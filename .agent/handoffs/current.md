@@ -1,6 +1,12 @@
 # Current Handoff
 
+Latest continuation handoff: [handoff.md](./handoff.md)
+
 ## Session Summary
+- Generated build artifact isolation is now configured:
+	- Nuxt build cache/output now target `app/generated/.nuxt` and `app/generated/.output`
+	- Git/Docker ignore rules updated so generated output does not pollute source directory status
+- Core agent context docs refreshed for current Nuxt 3 + Pinia architecture and `[id]/[variable]` route conventions.
 - Nuxt 3 migration branch is active and foundational migration scaffolding is in place.
 - Package manager migration to npm is complete (`package-lock.json` exists, `yarn.lock` removed).
 - Nuxt 3 config and plugin scaffolding completed (`nuxt.config.ts`, plugin shims).
@@ -40,6 +46,9 @@
 
 ## Latest Changes
 - Key files edited:
+	- `app/nuxt.config.ts`, `app/.gitignore`, `app/.dockerignore`, `.gitignore`, `.dockerignore`
+	- `.agent/context/project.md`, `.agent/context/conventions.md`, `.agent/context/domain.md`
+	- `.agent/tasks/active.md`, `.agent/handoffs/current.md`
 	- `app/package.json`, `app/package-lock.json`, `app/nuxt.config.ts`
 	- `app/plugins/api-compat.ts`, `app/plugins/download.ts`, `app/plugins/warehouse-compat.client.ts`, `app/plugins/leaflet.client.ts`
 	- `app/stores/app.ts`, `app/stores/messages.ts`, `app/stores/dataset.ts`, `app/stores/metadata.ts`, `app/stores/analysis.ts`

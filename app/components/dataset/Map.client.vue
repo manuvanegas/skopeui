@@ -86,7 +86,14 @@
     <!-- map -->
     <v-card-text class="map">
       <client-only placeholder="Loading map, please wait...">
-        <l-map ref="layerMap" class="leaflet-map" :min-zoom="2" @ready="mapReady">
+        <l-map
+          ref="layerMap"
+          class="leaflet-map"
+          :min-zoom="2"
+          :zoom="initialMapZoom"
+          :center="initialMapCenter"
+          @ready="mapReady"
+        >
           <l-tile-layer
             v-for="provider of leafletProviders"
             :key="provider.name"
@@ -142,6 +149,7 @@ import circleToPolygon from "circle-to-polygon";
 import queryString from "query-string";
 import fillTemplate from "es6-dynamic-template";
 import { useLegacyStoreActions } from "@/composables/useLegacyStoreActions";
+import { getInitialMapViewport } from "@/composables/useMapInitialViewport";
 import { useAppStore } from "@/stores/app";
 import { useDatasetStore } from "@/stores/dataset";
 import _ from "lodash";
@@ -190,6 +198,9 @@ const selectedArea = computed(() => datasetStore.selectedAreaInSquareKm);
 const currentStep = computed(() => stepNames.value.findIndex((x) => x === route.name));
 const showMapControls = computed(() => currentStep.value >= 1);
 const layerOpacity = computed(() => opacity.value / 100.0);
+const initialMapViewport = computed(() => getInitialMapViewport(metadata.value as any));
+const initialMapZoom = computed(() => initialMapViewport.value.zoom);
+const initialMapCenter = computed(() => initialMapViewport.value.center);
 const skopeWmsUrl = SKOPE_WMS_ENDPOINT;
 const leafletProviders = LEAFLET_PROVIDERS;
 const defaultCrs = computed(() => L?.CRS?.EPSG4326 || "");
@@ -379,6 +390,8 @@ function registerToolbarHandlers(map: any) {
 
 function mapReady(map: any) {
   leafletMap = map;
+  // Leaflet can calculate a stale size when mounted in flex/grid layouts; force recalc.
+  requestAnimationFrame(() => map.invalidateSize(true));
   const handler = (event: any) => {
     const leafletLayer = event.layer;
     if (isSkopeLayer(leafletLayer)) {

@@ -40,7 +40,8 @@ vi.mock("@/components/dataset/SubHeader.vue", () => ({
 vi.mock("@/components/dataset/Map.client.vue", () => ({
   default: {
     name: "MapStub",
-    template: '<div data-test="map">map</div>',
+    props: ["displayRaster"],
+    template: '<div data-test="map" :data-display-raster="String(displayRaster)">map</div>',
   },
 }));
 
@@ -100,6 +101,17 @@ describe("route /dataset/:id", () => {
 
     expect(page.findComponent({ name: "MapStub" }).exists()).toBe(true);
     expect(legacyActions.initializeDataset).toHaveBeenCalledWith("paleocar");
+  });
+
+  it("[behavior] configures selection map in non-raster mode", async () => {
+    const wrapper = await mountWithSuspense(DatasetIdPage, { global: { stubs: layoutStubs } });
+
+    await flushPromises();
+    const page = wrapper.findComponent(DatasetIdPage);
+    const map = page.find('[data-test="map"]');
+
+    expect(map.exists()).toBe(true);
+    expect(map.attributes("data-display-raster")).toBe("false");
   });
 
   it("[behavior] enables Visualize button only when study area is valid", async () => {

@@ -1,6 +1,14 @@
 export default defineNuxtConfig({
   compatibilityDate: "2025-01-15",
   devtools: { enabled: process.env.NODE_ENV !== "production" },
+  // Use Nuxt 3 conventional output directories.
+  buildDir: ".nuxt",
+
+  nitro: {
+    output: {
+      dir: ".output",
+    },
+  },
 
   plugins: [
     "~/plugins/markdown.ts",

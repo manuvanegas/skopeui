@@ -3,8 +3,8 @@
 ## In Progress
 - (platform) Nuxt 3 migration plan — started 2026-03-14
   - Scope: migrate SkopeUI from Nuxt 2/Vue 2 to Nuxt 3/Vue 3 while preserving route contracts and dataset workflows.
-  - Related files: `app/nuxt.config.js`, `app/package.json`, `app/pages/**`, `app/components/**`, `app/store/**`, `app/plugins/**`, `app/server/index.js`.
-  - Blockers: final choice for state strategy (`@pinia/nuxt` vs Vuex compatibility bridge) and Vuetify migration approach.
+  - Related files: `app/nuxt.config.ts`, `app/package.json`, `app/pages/**`, `app/components/**`, `app/stores/**`, `app/plugins/**`, `app/server/index.js`.
+  - Blockers: unresolved class-style components still importing `nuxt-property-decorator`.
   - Artifact: `.agent/checkpoints/2026-03-14-nuxt3-dependency-compatibility-matrix.md`
   - Artifact: `.agent/checkpoints/2026-03-14-nuxt3-target-package-draft.md`
   - Draft manifest: `app/package.nuxt3.draft.json`
@@ -67,6 +67,16 @@
 - Confirm whether any Hapi runtime behavior must remain externalized
 - Validate staging-like runtime behavior for dataset select/visualize/analyze flows
 - Migrate remaining `nuxt-property-decorator` class-style components to Vue 3-compatible patterns (or temporary compatibility path) to unblock Nuxt production build
+- Keep generated build artifacts isolated in `app/generated/` and out of source control
+
+## Latest Progress (2026-03-15)
+- Reconfigured Nuxt build output paths:
+  - `buildDir` -> `app/generated/.nuxt`
+  - Nitro output dir -> `app/generated/.output`
+- Added ignore rules so generated output does not pollute source or container contexts:
+  - `app/.gitignore`, `.gitignore`
+  - `app/.dockerignore`, `.dockerignore`
+- Refreshed core agent docs (`.agent/context/*`) for current Nuxt 3 + Pinia + `[id]/[variable]` route conventions.
 
 ## Latest Progress (2026-03-14)
 - Completed migration of `app/pages/dataset/_id/analyze/_variable.vue` from `$api()` compat calls to direct Pinia stores (`dataset`, `analysis`, `metadata`).

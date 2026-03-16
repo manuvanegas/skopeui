@@ -19,4 +19,12 @@ $ npm run preview
 $ npm run generate
 ```
 
+## Generated Output
+
+Nuxt/Nitro generated artifacts are written to:
+- `app/.nuxt`
+- `app/.output`
+
+These directories are intentionally ignored by git and Docker build contexts.
+
 For detailed explanation on how things work, checkout [Nuxt.js docs](https://nuxtjs.org).

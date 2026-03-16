@@ -54,7 +54,7 @@
     "web-streams-polyfill": "^4.2.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^5.2.3",
+    "@vitejs/plugin-vue": "^6.0.5",
     "@nuxt/eslint": "^1.2.0",
     "@types/file-saver": "^2.0.7",
     "@types/leaflet": "^1.9.17",

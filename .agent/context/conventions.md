@@ -6,7 +6,7 @@
 - Avoid unrelated refactors in feature/fix PRs
 
 ## Vue/Nuxt Patterns
-- Keep presentational logic in components and business/data logic in Vuex actions/getters
+- Keep presentational logic in components and business/data logic in composables/store actions
 - Reuse existing component patterns in `app/components/dataset/` before introducing new ones
 - Preserve established route file conventions in `app/pages/`
 
@@ -16,9 +16,14 @@
 - Functions/actions: descriptive verbs (`fetchMetadata`, `loadAnalysis`)
 
 ## State and Side Effects
-- Centralize API calls via store actions and existing axios plugin setup
-- Keep mutations simple and deterministic
+- Centralize API calls via Pinia store actions/composables
+- Keep state transitions explicit and deterministic
 - Prefer derived values through getters/computed properties
+
+## Generated Artifacts
+- Keep generated Nuxt/Nitro artifacts under `app/generated/`.
+- Do not commit generated build artifacts (`app/generated/.nuxt`, `app/generated/.output`).
+- Keep source directories (`app/pages`, `app/components`, `app/stores`) free of generated runtime output.
 
 ## Styling
 - Use existing SCSS variables and Vuetify tokens
