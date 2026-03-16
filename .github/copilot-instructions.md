@@ -1,5 +1,65 @@
 # Copilot Agent Instructions
 
+> Authoritative full context lives in `AGENTS.md` at the repo root. This file is a compressed sync.
+> When `AGENTS.md` changes, update this file to match.
+
+---
+
+## Codebase: SkopeUI
+
+Nuxt 3 SPA for spatiotemporal paleoclimate dataset discovery, visualization, and time-series analysis (SKOPE platform).
+
+**Stack:** Nuxt 3 + Vue 3 + TypeScript · Pinia stores · Vuetify 3 · Leaflet (legacy) → MapLibre GL JS + maplibre-geoman-free (target) · COG tile gateway via FastAPI (target, replacing GeoServer WMS).
+
+**User flow:** search datasets → select dataset → draw study area on map → visualize variable raster → analyze time series.
+
+### Key files
+
+| Path | Purpose |
+|---|---|
+| `app/components/dataset/Map.client.vue` | Adapter: renders Leaflet or MapLibre by engine flag |
+| `app/components/dataset/LeafletMap.client.vue` | Legacy map (keep as fallback) |
+| `app/components/dataset/MapLibrePoc.client.vue` | Active migration target |
+| `app/composables/useLegacyStoreActions.ts` | Bridge legacy actions → Pinia |
+| `app/composables/usePersistenceStorage.ts` | localStorage with SSR safety |
+| `app/stores/` | Pinia stores (authoritative) |
+| `app/store/` | Legacy Vuex-style (phase out) |
+| `app/nuxt.config.ts` | `runtimeConfig.public.mapEngine` defaults to `"leaflet"` |
+
+### Map engine flag
+
+URL param `?map_engine=maplibre` or `nuxt.config.ts` `public.mapEngine` switches the adapter.
+**Current P0 blocker:** MapLibrePoc base map and geoman draw controls are not rendering.
+
+### Dev commands (all inside Docker container — npm not on host)
+
+```bash
+docker compose -f base.yml -f dev.yml run --rm web npm run test
+docker compose -f base.yml -f dev.yml run --rm web npm exec vitest run tests/pages/dataset-id.spec.ts
+docker compose -f base.yml -f dev.yml up
+```
+
+`app/store/modules/_constants.js` is gitignored — copy from template before running.
+
+### Conventions
+
+- `.client.vue` suffix for browser-only components.
+- New state → Pinia `app/stores/`. Do not extend legacy `app/store/`.
+- Geometry persistence always through `useLegacyStoreActions` (`saveGeoJson`, `clearGeoJson`, `initializeDatasetGeoJson`).
+- Circle GeoJSON must be converted to polygon before store save / API submission.
+- Route guards gate visualize/analyze on `hasGeoJson` — do not remove.
+- No new WMS/GeoServer dependencies; migrate toward COG-only.
+
+### Migration roadmap (PR order)
+
+PR-01 (P0): Restore MapLibre basemap + geoman controls → PR-02: Draw parity → PR-03: Circle normalization → PR-04: COG metadata contract → PR-05: COG raster resolver → PR-06: Workflow parity → PR-07: MapLibre-mode tests → PR-08: Feature-flag flip + Leaflet/GeoServer removal.
+
+### Handoff
+
+Active handoff state: `.agent/handoffs/handoff.md`. Read on resume. Delete after completion.
+
+---
+
 ## Context Window Management
 
 When the context window usage exceeds 60%, perform a graceful handoff so work can resume in a new conversation without losing progress.
