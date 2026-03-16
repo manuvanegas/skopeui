@@ -1,14 +1,13 @@
 <template>
   <client-only>
     <v-dialog v-model="showTerms" persistent max-width="600">
-      <template #activator="{ on, attrs }">
+      <template #activator="{ props }">
         <v-btn
           style="font-weight: bold"
           color="white"
           class="text-body-1"
-          plain
-          v-bind="attrs"
-          v-on="on"
+          variant="plain"
+          v-bind="props"
         >
           Terms of Use
         </v-btn>
@@ -62,14 +61,14 @@
         <v-card-actions>
           <v-btn
             href="https://www.openskope.org"
-            outlined
+            variant="outlined"
             color="accent"
             @click="declineTerms"
           >
             I decline, return to www.openskope.org
           </v-btn>
           <v-spacer></v-spacer>
-          <v-btn depressed color="accent" @click.stop="acceptTerms"
+          <v-btn variant="flat" color="accent" @click.stop="acceptTerms"
             >I accept</v-btn
           >
         </v-card-actions>
@@ -77,54 +76,39 @@
     </v-dialog>
   </client-only>
 </template>
-<script>
-import Vue from "vue";
-import { Component } from "nuxt-property-decorator";
+<script setup lang="ts">
+import { ref, onMounted } from "vue";
 import { CITATION_TXT, CITATION_BIB } from "@/store/modules/_constants";
+import { usePersistenceStorage } from "@/composables/usePersistenceStorage";
 
-@Component()
-class TermsOfUse extends Vue {
-  showTerms = true;
-  clipboardMessage = false;
+const persistenceStorage = usePersistenceStorage();
+const TERMS_KEY = "skope:termsAccepted";
 
-  created() {
-    if (process.client) {
-      this.showTerms = !this.$warehouse.get(this.termsAcceptedWarehouseKey);
-    }
-  }
+const showTerms = ref(true);
+const clipboardMessage = ref(false);
+const citationText = CITATION_TXT;
+const citationBibTex = CITATION_BIB;
 
-  get citationText() {
-    return CITATION_TXT;
-  }
+onMounted(() => {
+  showTerms.value = !persistenceStorage.get(TERMS_KEY);
+});
 
-  get citationBibTex() {
-    return CITATION_BIB;
-  }
-
-  get termsAcceptedWarehouseKey() {
-    return "skope:termsAccepted";
-  }
-
-  acceptTerms() {
-    this.showTerms = false;
-    this.$warehouse.set(this.termsAcceptedWarehouseKey, true);
-  }
-
-  declineTerms() {
-    this.$warehouse.remove(this.termsAcceptedWarehouseKey);
-  }
-
-  copyToClipboard(evt, data) {
-    const srcElement = evt.srcElement;
-    const citationText = srcElement.value;
-    navigator.clipboard.writeText(citationText).then(() => {
-      srcElement.select();
-      this.clipboardMessage = true;
-    });
-  }
+function acceptTerms() {
+  showTerms.value = false;
+  persistenceStorage.set(TERMS_KEY, true);
 }
 
-export default TermsOfUse;
+function declineTerms() {
+  persistenceStorage.remove(TERMS_KEY);
+}
+
+function copyToClipboard(evt: MouseEvent) {
+  const srcElement = evt.target as HTMLTextAreaElement;
+  navigator.clipboard.writeText(srcElement.value).then(() => {
+    srcElement.select();
+    clipboardMessage.value = true;
+  });
+}
 </script>
 
 <style></style>

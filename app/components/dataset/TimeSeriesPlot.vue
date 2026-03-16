@@ -1,37 +1,33 @@
 <template>
-  <v-card outlined height="100%" width="100%">
+  <v-card variant="outlined" height="100%" width="100%">
     <v-card-text style="height: 90%">
-      <v-toolbar flat class="py-0 my-0">
+      <v-toolbar variant="flat" class="py-0 my-0">
         <v-row align="baseline" justify="space-between">
           <!-- area -->
           <v-col v-if="showArea" cols="auto" class="d-flex">
-            <v-tooltip top>
-              <template #activator="{ on, attrs }">
+            <v-tooltip location="top" text="Selected area in square kilometers">
+              <template #activator="{ props }">
                 <h3
-                  v-bind="attrs"
+                  v-bind="props"
                   class="font-weight-light text-center pa-2"
                   style="background-color: #e4e7ef"
-                  v-on="on"
                 >
                   {{ selectedAreaInSquareKm }} km<sup>2</sup>
                 </h3>
               </template>
-              <span>Selected area in square kilometers</span>
             </v-tooltip>
             <v-divider vertical class="mx-2"></v-divider>
-            <v-tooltip top>
-              <template #activator="{ on, attrs }">
+            <v-tooltip location="top" text="Total cell area used in this time series calculation">
+              <template #activator="{ props }">
                 <h3
-                  v-bind="attrs"
+                  v-bind="props"
                   class="font-weight-light text-center pa-2"
                   style="background-color: #e4e7ef"
-                  v-on="on"
                 >
                   {{ totalCellArea }} km<sup>2</sup> ({{ numberOfCells }}
                   cells)
                 </h3>
               </template>
-              <span>Total cell area used in this time series calculation</span>
             </v-tooltip>
           </v-col>
           <!-- temporal range input -->
@@ -71,12 +67,12 @@
               <div class="d-flex flex-column mt-n2">
                 <v-btn
                   :disabled="!hasTemporalRangeChanges || !isTemporalRangeValid"
-                  x-small
+                  size="x-small"
                   color="secondary"
                   @click="setTemporalRange"
                   >Apply</v-btn
                 >
-                <v-btn x-small color="secondary" @click="resetTemporalRange"
+                <v-btn size="x-small" color="secondary" @click="resetTemporalRange"
                   >Reset</v-btn
                 >
               </div>
@@ -84,88 +80,75 @@
           </v-form>
           <!-- step controls -->
           <v-col v-if="showStepControls" align="right">
-            <v-tooltip top>
-              <template #activator="{ attrs, on }">
+            <v-tooltip location="top" text="Go to the first year of the defined temporal range">
+              <template #activator="{ props }">
                 <v-btn
                   icon
-                  v-bind="attrs"
+                  v-bind="props"
                   color="accent"
-                  v-on="on"
                   @click="gotoFirstYear"
                 >
-                  <v-icon>skip_previous</v-icon>
+                  <v-icon>mdi-skip-previous</v-icon>
                 </v-btn>
               </template>
-              <span>Go to the first year of the defined temporal range</span>
             </v-tooltip>
-            <v-tooltip top>
-              <template #activator="{ attrs, on }">
+            <v-tooltip location="top" text="Previous year">
+              <template #activator="{ props }">
                 <v-btn
                   icon
-                  v-bind="attrs"
+                  v-bind="props"
                   color="accent"
-                  v-on="on"
                   @click="previousYear"
                 >
-                  <v-icon>arrow_left</v-icon>
+                  <v-icon>mdi-chevron-left</v-icon>
                 </v-btn>
               </template>
-              <span>Previous year</span>
             </v-tooltip>
-            <v-tooltip top>
-              <template #activator="{ attrs, on }">
-                <v-btn icon v-bind="attrs" v-on="on" @click="togglePlay">
+            <v-tooltip location="top" :text="isAnimationPlaying ? 'Pause animation' : 'Animate layers'">
+              <template #activator="{ props }">
+                <v-btn icon v-bind="props" @click="togglePlay">
                   <v-icon color="accent">{{ playIcon }}</v-icon>
                 </v-btn>
               </template>
-              <span>{{
-                isAnimationPlaying ? "Pause animation" : "Animate layers"
-              }}</span>
             </v-tooltip>
-            <v-tooltip top>
-              <template #activator="{ attrs, on }">
+            <v-tooltip location="top" text="Next year">
+              <template #activator="{ props }">
                 <v-btn
                   icon
-                  v-bind="attrs"
+                  v-bind="props"
                   color="accent"
-                  v-on="on"
                   @click="nextYear"
                 >
-                  <v-icon>arrow_right</v-icon>
+                  <v-icon>mdi-chevron-right</v-icon>
                 </v-btn>
               </template>
-              <span>Next year</span>
             </v-tooltip>
-            <v-tooltip top>
-              <template #activator="{ attrs, on }">
+            <v-tooltip location="top" text="Go to the last year of the defined temporal range">
+              <template #activator="{ props }">
                 <v-btn
                   icon
-                  v-bind="attrs"
+                  v-bind="props"
                   color="accent"
-                  v-on="on"
                   @click="gotoLastYear"
                 >
-                  <v-icon>skip_next</v-icon>
+                  <v-icon>mdi-skip-next</v-icon>
                 </v-btn>
               </template>
-              <span>Go to the last year of the defined temporal range</span>
             </v-tooltip>
           </v-col>
           <v-col v-if="showArea" cols="auto" align="right">
-            <v-tooltip top>
-              <template #activator="{ on, attrs }">
+            <v-tooltip location="top" text="Return to Select Area">
+              <template #activator="{ props }">
                 <v-btn
-                  v-bind="attrs"
+                  v-bind="props"
                   :to="selectAreaLocation"
                   class="mb-4 mx-3"
                   color="accent"
-                  small
-                  v-on="on"
+                  size="small"
                 >
-                  <v-icon small>fas fa-map</v-icon>
+                  <v-icon size="small">mdi-map-marker</v-icon>
                 </v-btn>
               </template>
-              <span>Return to Select Area</span>
             </v-tooltip>
           </v-col>
         </v-row>
@@ -194,392 +177,245 @@
   </v-card>
 </template>
 
-<script>
-import Vue from "vue";
+<script setup lang="ts">
+import { ref, computed, watch, onMounted } from "vue";
 import _ from "lodash";
-import { Component, Prop, Watch } from "nuxt-property-decorator";
-import LoadingSpinner from "@/components/LoadingSpinner.vue";
+import { useRoute } from "vue-router";
+import { useDatasetStore } from "@/stores/dataset";
 
-@Component({
-  components: {
-    // load time series plotly component lazily to avoid document is not defined errors
-    // https://stackoverflow.com/a/50458090
-    Plotly: () => import("vue-plotly").then((p) => p.Plotly),
-    LoadingSpinner,
+const props = defineProps<{
+  yearSelected?: number | null;
+  showStepControls?: boolean;
+  showArea?: boolean;
+  traces?: any[];
+  yAxisLabel?: string | null;
+}>();
+
+const emit = defineEmits<{
+  (e: "year-selected", year: number): void;
+  (e: "selected-temporal-range", range: [number, number]): void;
+}>();
+
+// Lazy-load PlotlyClient to avoid SSR issues
+const Plotly = defineAsyncComponent(() => import("@/components/dataset/PlotlyClient.vue"));
+
+const datasetStore = useDatasetStore();
+const route = useRoute();
+
+// Local state
+const animationSpeed = ref(2000);
+const isAnimationPlaying = ref(false);
+const localTemporalRangeMin = ref(1);
+const localTemporalRangeMax = ref(new Date().getFullYear());
+const isTemporalRangeEditable = ref(false);
+const isTemporalRangeValid = ref(false);
+const plotlyRef = ref<any>(null);
+
+// Computed
+const selectedTemporalRange = computed({
+  get() { return datasetStore.temporalRange; },
+  set(range: [number, number]) {
+    datasetStore.setTemporalRange(range);
+    emit("selected-temporal-range", datasetStore.temporalRange);
   },
-})
-class TimeSeriesPlot extends Vue {
-  @Prop({ default: null })
-  yearSelected;
+});
 
-  @Prop({ default: true })
-  showStepControls;
+const temporalRangeMin = computed(() => datasetStore.temporalRangeMin);
+const temporalRangeMax = computed(() => datasetStore.temporalRangeMax);
+const timeSeriesRequestStatus = computed(() => datasetStore.timeSeriesRequestStatus);
+const selectedAreaInSquareKm = computed(() => datasetStore.selectedAreaInSquareKm);
+const minYear = computed(() => datasetStore.minYear);
+const maxYear = computed(() => datasetStore.maxYear);
+const variable = computed(() => datasetStore.variable as any);
+const totalCellArea = computed(() => datasetStore.totalCellAreaInSquareKm);
+const numberOfCells = computed(() => datasetStore.numberOfCells);
+const timeSeriesData = computed(() => props.traces);
+const hasMultipleTimeSeries = computed(() => props.traces != null && props.traces.length > 1);
+const hasTimeSeries = computed(() => props.traces != null && props.traces[0]?.x?.length > 0);
+const canHandleTimeSeriesRequest = computed(() => datasetStore.canHandleTimeSeriesRequest);
 
-  @Prop({ default: false })
-  showArea;
+const formTemporalRangeMin = computed({
+  get() { return isTemporalRangeEditable.value ? localTemporalRangeMin.value : selectedTemporalRange.value[0]; },
+  set(value: number) { localTemporalRangeMin.value = value; },
+});
 
-  @Prop({})
-  traces;
+const formTemporalRangeMax = computed({
+  get() { return isTemporalRangeEditable.value ? localTemporalRangeMax.value : selectedTemporalRange.value[1]; },
+  set(value: number) { localTemporalRangeMax.value = value; },
+});
 
-  @Prop({ default: null })
-  yAxisLabel;
+const hasTemporalRangeChanges = computed(() =>
+  localTemporalRangeMin.value !== selectedTemporalRange.value[0] ||
+  localTemporalRangeMax.value !== selectedTemporalRange.value[1]
+);
 
-  // "play" automatically advances the timeseries year
-  animationSpeed = 2000;
-  isAnimationPlaying = false;
-  // FIXME: clean up https://github.com/openskope/skopeui/issues/106
-  localTemporalRangeMin = 1;
-  localTemporalRangeMax = 2020;
-  isTemporalRangeEditable = false;
-  isTemporalRangeValid = false;
+const timeStepsLabel = computed(() => {
+  const steps = selectedTemporalRange.value[1] - selectedTemporalRange.value[0] + 1;
+  return `${steps} time steps`;
+});
 
-  get timeStepsLabel() {
-    const timeSteps =
-      this.selectedTemporalRange[1] - this.selectedTemporalRange[0] + 1;
-    return `${timeSteps} time steps`;
+const xAxisTitle = computed(() =>
+  props.yearSelected == null ? "Year" : `<b>Year ${props.yearSelected}</b>`
+);
+
+const yAxisTitle = computed(() => {
+  const variableName = variable.value.name;
+  return !props.yAxisLabel ? variableName : `${props.yAxisLabel}`;
+});
+
+const shapes = computed(() => {
+  if (!_.isNull(props.yearSelected ?? null)) {
+    return [{
+      type: "line",
+      x0: props.yearSelected,
+      x1: props.yearSelected,
+      yref: "paper",
+      y0: 0,
+      y1: 1,
+      line: { color: "rgb(255, 140, 0)", width: 3 },
+    }];
   }
+  return [];
+});
 
-  get formTemporalRangeMin() {
-    return this.isTemporalRangeEditable
-      ? this.localTemporalRangeMin
-      : this.selectedTemporalRange[0];
-  }
+const layoutMetadata = computed(() => ({
+  margin: { b: 60, t: 10, pad: 2 },
+  showlegend: hasMultipleTimeSeries.value,
+  legend: { x: 1, y: 0.5 },
+  xaxis: { title: xAxisTitle.value, linewidth: 3, gridwidth: 3, automargin: true },
+  yaxis: { title: yAxisTitle.value, linewidth: 3, gridwidth: 3, automargin: true },
+  font: { size: 14 },
+  shapes: shapes.value,
+}));
 
-  get formTemporalRangeMax() {
-    return this.isTemporalRangeEditable
-      ? this.localTemporalRangeMax
-      : this.selectedTemporalRange[1];
-  }
+const options = computed(() => ({
+  modeBarButtonsToRemove: ["toImage"],
+  responsive: true,
+}));
 
-  set formTemporalRangeMin(value) {
-    this.localTemporalRangeMin = value;
-  }
+const playIcon = computed(() =>
+  isAnimationPlaying.value ? "mdi-pause-circle" : "mdi-play-circle"
+);
 
-  set formTemporalRangeMax(value) {
-    this.localTemporalRangeMax = value;
-  }
+const selectAreaLocation = computed(() => ({
+  name: "dataset-id",
+  params: { id: (route.params.id ?? "") as string },
+}));
 
-  get hasTemporalRangeChanges() {
-    return (
-      this.localTemporalRangeMin !== this.selectedTemporalRange[0] ||
-      this.localTemporalRangeMax !== this.selectedTemporalRange[1]
-    );
-  }
+// Methods
+function enableTemporalRangeEdit() {
+  if (isTemporalRangeEditable.value) return;
+  localTemporalRangeMin.value = selectedTemporalRange.value[0];
+  localTemporalRangeMax.value = selectedTemporalRange.value[1];
+  isTemporalRangeEditable.value = true;
+}
 
-  get selectAreaLocation() {
-    return {
-      name: "dataset-id",
-      params: { id: this.$route.params.id },
-    };
-  }
+function validateMinYear(value: number) {
+  if (value < minYear.value) return `Please enter a min year >= ${minYear.value}`;
+  if (value >= maxYear.value) return `Please enter a min year < ${maxYear.value}`;
+  return true;
+}
 
-  get selectedTemporalRange() {
-    return this.$api().dataset.temporalRange;
-  }
+function validateMaxYear(value: number) {
+  if (value <= minYear.value) return `Please enter a max year > ${minYear.value}`;
+  if (value > maxYear.value) return `Please enter a max year <= ${maxYear.value}`;
+  return true;
+}
 
-  set selectedTemporalRange(temporalRange) {
-    this.$api().dataset.setTemporalRange(temporalRange);
-    this.$emit("selected-temporal-range", this.selectedTemporalRange);
-  }
+function updatePlotlyYear(data: any) {
+  setYear(data.points[0].x);
+}
 
-  get temporalRangeMin() {
-    return this.$api().dataset.temporalRangeMin;
-  }
+function setYear(year: number) {
+  emit("year-selected", year);
+}
 
-  get temporalRangeMax() {
-    return this.$api().dataset.temporalRangeMax;
-  }
+function setTemporalRange() {
+  if (!hasTemporalRangeChanges.value || !isTemporalRangeValid.value) return;
+  selectedTemporalRange.value = [localTemporalRangeMin.value, localTemporalRangeMax.value];
+  isTemporalRangeEditable.value = false;
+  if (props.yearSelected == null) return;
+  if (props.yearSelected < temporalRangeMin.value) setYear(temporalRangeMin.value);
+  else if (props.yearSelected > temporalRangeMax.value) setYear(temporalRangeMax.value);
+}
 
-  get timeSeriesRequestStatus() {
-    return this.$api().dataset.timeSeriesRequestStatus;
-  }
+function resetTemporalRange() {
+  localTemporalRangeMin.value = datasetStore.minYear;
+  localTemporalRangeMax.value = datasetStore.maxYear;
+  setTemporalRange();
+}
 
-  get selectedAreaInSquareKm() {
-    return this.$api().dataset.selectedAreaInSquareKm;
-  }
+function gotoFirstYear() {
+  if (variable.value === null) return;
+  setYear(temporalRangeMin.value);
+}
 
-  get minYear() {
-    return this.$api().dataset.minYear;
-  }
+function gotoLastYear() {
+  if (variable.value === null) return;
+  setYear(temporalRangeMax.value);
+}
 
-  get maxYear() {
-    return this.$api().dataset.maxYear;
-  }
+function nextYear() {
+  if (variable.value === null) return;
+  setYear(_.clamp(parseInt(String(props.yearSelected)) + 1, temporalRangeMin.value, temporalRangeMax.value));
+}
 
-  get variable() {
-    return this.$api().dataset.variable;
-  }
+function previousYear() {
+  if (variable.value === null) return;
+  setYear(_.clamp((props.yearSelected ?? 0) - 1, temporalRangeMin.value, temporalRangeMax.value));
+}
 
-  get xAxisTitle() {
-    return this.yearSelected == null
-      ? "Year"
-      : `<b>Year ${this.yearSelected}</b>`;
-  }
-
-  get yAxisTitle() {
-    const variableName = this.variable.name;
-    return !this.yAxisLabel ? variableName : `${this.yAxisLabel}`;
-  }
-
-  get layoutMetadata() {
-    return {
-      margin: {
-        b: 60,
-        t: 10,
-        pad: 2,
-      },
-      showlegend: this.hasMultipleTimeSeries,
-      legend: { x: 1, y: 0.5 },
-      xaxis: {
-        title: this.xAxisTitle,
-        linewidth: 3,
-        gridwidth: 3,
-        automargin: true,
-      },
-      yaxis: {
-        title: this.yAxisTitle,
-        linewidth: 3,
-        gridwidth: 3,
-        automargin: true,
-      },
-      font: {
-        size: 14,
-      },
-      shapes: this.shapes,
-    };
-  }
-
-  get options() {
-    return {
-      modeBarButtonsToRemove: ["toImage"],
-      responsive: true,
-    };
-  }
-
-  get playIcon() {
-    if (this.isAnimationPlaying) {
-      return "pause_circle_filled";
-    } else {
-      return "play_circle_filled";
-    }
-  }
-
-  get shapes() {
-    if (!_.isNull(this.yearSelected)) {
-      return [
-        {
-          type: "line",
-          x0: this.yearSelected,
-          x1: this.yearSelected,
-          yref: "paper",
-          y0: 0,
-          y1: 1,
-          line: {
-            color: "rgb(255, 140, 0)",
-            width: 3,
-          },
-        },
-      ];
-    }
-    return [];
-  }
-
-  get canHandleTimeSeriesRequest() {
-    return this.$api().dataset.canHandleTimeSeriesRequest;
-  }
-
-  get hasTimeSeries() {
-    return this.traces != null && this.traces[0].x.length > 0;
-  }
-
-  get hasMultipleTimeSeries() {
-    // FIXME: assume traces always has one element
-    return this.traces != null && this.traces.length > 1;
-  }
-
-  get timeSeriesData() {
-    return this.traces;
-  }
-
-  get totalCellArea() {
-    return this.$api().dataset.totalCellAreaInSquareKm;
-  }
-
-  get numberOfCells() {
-    return this.$api().dataset.numberOfCells;
-  }
-
-  get timeSeriesRequestData() {
-    return this.$api().dataset.timeSeriesRequestData;
-  }
-
-  mounted() {
-    const api = this.$api();
-    // clamp temporal range
-    api.dataset.setTemporalRange(api.dataset.temporalRange);
-    this.localTemporalRangeMin = this.selectedTemporalRange[0];
-    this.localTemporalRangeMax = this.selectedTemporalRange[1];
-  }
-
-  enableTemporalRangeEdit() {
-    if (this.isTemporalRangeEditable) {
-      return;
-    }
-    this.localTemporalRangeMin = this.selectedTemporalRange[0];
-    this.localTemporalRangeMax = this.selectedTemporalRange[1];
-    this.isTemporalRangeEditable = true;
-  }
-
-  validateMinYear(value) {
-    if (value < this.minYear) {
-      return `Please enter a min year >= ${this.minYear}`;
-    }
-    if (value >= this.maxYear) {
-      return `Please enter a min year < ${this.maxYear}`;
-    }
-    return true;
-  }
-
-  validateMaxYear(value) {
-    if (value <= this.minYear) {
-      return `Please enter a max year > ${this.minYear}`;
-    }
-    if (value > this.maxYear) {
-      return `Please enter a max year <= ${this.maxYear}`;
-    }
-    return true;
-  }
-
-  updatePlotlyYear(data) {
-    this.setYear(data.points[0].x);
-  }
-
-  setYear(year) {
-    this.$emit("year-selected", year);
-  }
-
-  setTemporalRange() {
-    // no-op if local temporal range min and max are equal to the selected temporal range
-    if (!this.hasTemporalRangeChanges) {
-      return;
-    }
-    if (!this.isTemporalRangeValid) {
-      return;
-    }
-    this.selectedTemporalRange = [
-      this.localTemporalRangeMin,
-      this.localTemporalRangeMax,
-    ];
-    console.log("setting temporal range editable to false");
-    this.isTemporalRangeEditable = false;
-    // if yearSelected is set, clamp it to the new temporal range min / max if needed
-    if (this.yearSelected == null) {
-      return;
-    }
-    if (this.yearSelected < this.temporalRangeMin) {
-      this.setYear(this.temporalRangeMin);
-    } else if (this.yearSelected > this.temporalRangeMax) {
-      this.setYear(this.temporalRangeMax);
-    }
-  }
-
-  resetTemporalRange() {
-    this.localTemporalRangeMin = this.$api().dataset.minYear;
-    this.localTemporalRangeMax = this.$api().dataset.maxYear;
-    this.setTemporalRange();
-  }
-
-  gotoFirstYear() {
-    if (this.variable === null) {
-      return;
-    }
-    this.setYear(this.temporalRangeMin);
-  }
-
-  gotoLastYear() {
-    if (this.variable === null) {
-      return;
-    }
-    this.setYear(this.temporalRangeMax);
-  }
-
-  nextYear() {
-    if (this.variable === null) {
-      return;
-    }
-    this.setYear(
-      _.clamp(
-        parseInt(this.yearSelected) + 1,
-        this.temporalRangeMin,
-        this.temporalRangeMax
-      )
-    );
-  }
-
-  previousYear() {
-    if (this.variable === null) {
-      return;
-    }
-    this.setYear(
-      _.clamp(
-        this.yearSelected - 1,
-        this.temporalRangeMin,
-        this.temporalRangeMax
-      )
-    );
-  }
-
-  togglePlay(event) {
-    this.isAnimationPlaying = !this.isAnimationPlaying;
-    if (this.isAnimationPlaying) {
-      // start an interval
-      const animationInterval = setInterval(() => {
-        if (
-          this.isAnimationPlaying &&
-          this.yearSelected < this.temporalRangeMax
-        ) {
-          this.nextYear();
-        } else {
-          this.isAnimationPlaying = false;
-          clearInterval(animationInterval);
-          return;
-        }
-      }, this.animationSpeed);
-    }
-  }
-
-  async getTimeSeriesPlotImage() {
-    const svg = await this.$refs.plot.toImage({
-      format: "svg",
-      height: 600,
-      width: 1200,
-    });
-    const png = await this.$refs.plot.toImage({
-      format: "png",
-      height: 600,
-      width: 1200,
-    });
-    return {
-      png,
-      svg,
-    };
-  }
-
-  @Watch("timeSeriesData")
-  watchTimeSeriesData(timeSeriesData) {
-    if (this.$refs.plot) {
-      this.$refs.plot.update(timeSeriesData, this.layoutMetadata);
-    }
-  }
-
-  @Watch("layoutMetadata")
-  watchLayoutMetadata(layoutMetadata) {
-    if (this.$refs.plot) {
-      this.$refs.plot.update(this.timeSeriesData, layoutMetadata);
-    }
+function togglePlay() {
+  isAnimationPlaying.value = !isAnimationPlaying.value;
+  if (isAnimationPlaying.value) {
+    const interval = setInterval(() => {
+      if (isAnimationPlaying.value && (props.yearSelected ?? 0) < temporalRangeMax.value) {
+        nextYear();
+      } else {
+        isAnimationPlaying.value = false;
+        clearInterval(interval);
+      }
+    }, animationSpeed.value);
   }
 }
-export default TimeSeriesPlot;
+
+async function getTimeSeriesPlotImage() {
+  const svg = await plotlyRef.value?.toImage({ format: "svg", height: 600, width: 1200 });
+  const png = await plotlyRef.value?.toImage({ format: "png", height: 600, width: 1200 });
+  return { png, svg };
+}
+
+defineExpose({ getTimeSeriesPlotImage });
+
+onMounted(() => {
+  localTemporalRangeMin.value = selectedTemporalRange.value[0];
+  localTemporalRangeMax.value = selectedTemporalRange.value[1];
+});
+
+watch(
+  () => [minYear.value, maxYear.value, selectedTemporalRange.value[0], selectedTemporalRange.value[1]],
+  ([nextMin, nextMax, selectedMin, selectedMax]) => {
+    // Keep the selected range within metadata bounds when datasets/routes change.
+    if (selectedMin < nextMin || selectedMax > nextMax || selectedMin > selectedMax) {
+      selectedTemporalRange.value = [nextMin, nextMax];
+    }
+
+    // Keep form inputs in sync unless the user is actively editing.
+    if (!isTemporalRangeEditable.value) {
+      localTemporalRangeMin.value = selectedTemporalRange.value[0];
+      localTemporalRangeMax.value = selectedTemporalRange.value[1];
+    }
+  },
+  { immediate: true }
+);
+
+watch(timeSeriesData, (data) => {
+  plotlyRef.value?.update(data, layoutMetadata.value);
+});
+
+watch(layoutMetadata, (layout) => {
+  plotlyRef.value?.update(timeSeriesData.value, layout);
+});
 </script>
 <style>
 .time-series {

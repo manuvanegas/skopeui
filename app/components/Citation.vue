@@ -1,14 +1,13 @@
 <template>
   <client-only>
     <v-dialog v-model="showCitation" width="auto">
-      <template #activator="{ on, props }">
+      <template #activator="{ props }">
         <v-btn
           style="font-weight: bold"
           color="white"
           class="text-body-1"
-          plain
+          variant="plain"
           v-bind="props"
-          v-on="on"
         >
           Cite SKOPE
         </v-btn>
@@ -62,35 +61,22 @@
     </v-dialog>
   </client-only>
 </template>
-<script>
-import Vue from "vue";
-import { Component } from "nuxt-property-decorator";
+<script setup lang="ts">
+import { ref } from "vue";
 import { CITATION_TXT, CITATION_BIB } from "@/store/modules/_constants";
 
-@Component()
-class Citation extends Vue {
-  showCitation = false;
-  clipboardMessage = false;
+const showCitation = ref(false);
+const clipboardMessage = ref(false);
+const citationText = CITATION_TXT;
+const citationBibTex = CITATION_BIB;
 
-  get citationText() {
-    return CITATION_TXT;
-  }
-
-  get citationBibTex() {
-    return CITATION_BIB;
-  }
-
-  copyToClipboard(evt, data) {
-    const srcElement = evt.srcElement;
-    const citationText = srcElement.value;
-    navigator.clipboard.writeText(citationText).then(() => {
-      srcElement.select();
-      this.clipboardMessage = true;
-    });
-  }
+function copyToClipboard(evt: MouseEvent) {
+  const srcElement = evt.target as HTMLTextAreaElement;
+  navigator.clipboard.writeText(srcElement.value).then(() => {
+    srcElement.select();
+    clipboardMessage.value = true;
+  });
 }
-
-export default Citation;
 </script>
 
 <style></style>

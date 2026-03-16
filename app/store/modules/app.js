@@ -11,25 +11,25 @@ class App extends VuexModule {
       id: 1,
       name: "index",
       label: "Select Dataset",
-      icon: "fas fa-database",
+      icon: "mdi-database",
     },
     {
       id: 2,
       name: "dataset-id",
       label: "Select Area",
-      icon: "fas fa-map",
+      icon: "mdi-map-marker",
     },
     {
       id: 3,
       name: "dataset-id-visualize-variable",
       label: "Visualize",
-      icon: "fas fa-chart-bar",
+      icon: "mdi-chart-bar",
     },
     {
       id: 4,
       name: "dataset-id-analyze-variable",
       label: "Analyze",
-      icon: "fas fa-chart-line",
+      icon: "mdi-chart-line",
     },
   ];
 

@@ -1,40 +1,35 @@
 <template>
   <v-container fluid>
-    <v-row dense>
+    <v-row>
       <v-col class="ma-0">
         <h1>
           Select a Dataset
-          <v-tooltip bottom>
-            <template #activator="{ on, attrs }">
+          <v-tooltip location="bottom" text="View the SKOPE user guide (opens in a new tab)">
+            <template #activator="{ props }">
               <v-btn
                 icon
-                link
-                fab
                 class="mt-n1 ml-n1"
                 href="https://www.openskope.org/skope-users-guide/"
                 target="_blank"
-                v-bind="attrs"
-                v-on="on"
+                v-bind="props"
               >
-                <v-icon>fas fa-question-circle</v-icon>
+                <v-icon>mdi-help-circle-outline</v-icon>
               </v-btn>
             </template>
-            <span>View the SKOPE user guide (opens in a new tab)</span>
           </v-tooltip>
         </h1>
       </v-col>
     </v-row>
     <Search />
-    <v-row dense class="ma-0 pa-0">
+    <v-row class="ma-0 pa-0">
       <v-col class="ma-0">
-        <template v-for="dataset in datasets" router exact>
+        <template v-for="dataset in datasets" :key="dataset.absoluteUrl" router exact>
           <v-card
-            :key="dataset.absoluteUrl"
             class="pa-4 my-3"
             elevation="0"
-            outlined
+            variant="outlined"
           >
-            <ListItem :key="dataset.absolute_url" v-bind="dataset" />
+            <ListItem v-bind="dataset" />
           </v-card>
         </template>
         <v-alert v-if="datasets.length === 0" type="warning">
@@ -45,35 +40,41 @@
   </v-container>
 </template>
 
-<script>
-import { Component } from "nuxt-property-decorator";
-import Vue from "vue";
+<script setup lang="ts">
+import { computed } from "vue";
 import ListItem from "@/components/dataset/ListItem.vue";
 import Search from "@/components/dataset/Search.vue";
-import { loadAllDatasetMetadata } from "@/store/actions";
+import { useDatasetStore } from "@/stores/dataset";
+import { useMessagesStore } from "@/stores/messages";
+import { useMetadataStore } from "@/stores/metadata";
+import { useLegacyStoreActions } from "@/composables/useLegacyStoreActions";
 
-@Component({
-  layout: "DefaultLayout",
-  components: {
-    ListItem,
-    Search,
-  },
-})
-class LandingPage extends Vue {
-  get datasets() {
-    return this.$api().metadata.filteredDatasets;
-  }
+definePageMeta({ layout: "default" });
 
-  async fetch() {
-    console.log("Landing page: loading all dataset metadata");
-    await loadAllDatasetMetadata(this.$api());
-  }
+const legacyActions = useLegacyStoreActions();
+const datasetStore = useDatasetStore();
+const metadataStore = useMetadataStore();
+const messagesStore = useMessagesStore();
 
-  created() {
-    const api = this.$api();
-    api.dataset.clearTimeSeries();
-    api.dataset.setMetadata(null);
+const datasets = computed(() => metadataStore.filteredDatasets);
+
+datasetStore.clearTimeSeries();
+datasetStore.setMetadata(null);
+
+const { error: metadataLoadError } = await useAsyncData(
+  "landingPageMetadata",
+  async () => {
+    try {
+      await legacyActions.loadAllDatasetMetadata();
+      return true;
+    } catch (error) {
+      console.error("Failed to load dataset metadata", error);
+      return false;
+    }
   }
+);
+
+if (metadataLoadError.value != null) {
+  messagesStore.error("Unable to load dataset metadata. Please try again shortly.");
 }
-export default LandingPage;
 </script>

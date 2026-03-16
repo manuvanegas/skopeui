@@ -1,6 +1,6 @@
 <template>
   <v-form @submit.prevent>
-    <v-row class="mb-n7" dense align="center" justify="center">
+    <v-row class="mb-n7" align="center" justify="center">
       <!-- filter by variable -->
       <v-col cols="12" md="3" sm="6">
         <v-combobox
@@ -9,34 +9,29 @@
           :items="variableClasses"
           label="Filter by variable"
           multiple
-          small-chips
-          outlined
-          @change="filterDatasets"
+          chips
+          variant="outlined"
+          @update:modelValue="filterDatasets"
           @blur="filterDatasets"
         >
-          <template
-            #selection="{ attrs, item: variableClass, selected, parent }"
-          >
+          <template #chip="{ item: variableClass, props: chipProps }">
             <v-chip
-              v-bind="attrs"
+              v-bind="chipProps"
               color="primary"
-              dark
-              :input-value="selected"
               label
-              small
+              size="small"
             >
-              <span class="pr-2">
-                {{ variableClass }}
-              </span>
-              <v-icon small @click="parent.selectItem(variableClass)">
-                $delete
-              </v-icon>
+              {{ variableClass.title ?? variableClass }}
             </v-chip>
           </template>
-          <template #item="{ item: variableClass }">
-            <v-chip color="primary" dark label small>
-              {{ variableClass }}
-            </v-chip>
+          <template #item="{ item: variableClass, props: itemProps }">
+            <v-list-item v-bind="itemProps">
+              <template #title>
+                <v-chip color="primary" label size="small">
+                  {{ variableClass.title ?? variableClass }}
+                </v-chip>
+              </template>
+            </v-list-item>
           </template>
         </v-combobox>
       </v-col>
@@ -47,116 +42,90 @@
           id="keywordQuery"
           v-model="keywordSearchQuery"
           clearable
-          outlined
+          variant="outlined"
           data-toggle="hideseek"
           label="Keyword search"
-          append-icon="search"
-          @change="filterDatasets"
+          append-inner-icon="mdi-magnify"
+          @update:modelValue="filterDatasets"
           @click:clear="clearSearchQuery"
-          @click:append="filterDatasets"
-        >
-        </v-text-field>
+          @click:append-inner="filterDatasets"
+        />
       </v-col>
       <v-col cols="12" md="2" sm="6">
         <v-text-field
           v-model="startYear"
-          outlined
+          variant="outlined"
           label="Start Year"
           :rules="startYearRules"
           type="number"
-          @change="filterDatasets"
+          @update:modelValue="filterDatasets"
           @blur="filterDatasets"
-        >
-        </v-text-field>
+        />
       </v-col>
       <v-col cols="12" md="2" sm="6">
         <v-text-field
           v-model="endYear"
-          outlined
+          variant="outlined"
           :rules="endYearRules"
           label="End Year"
           type="number"
-          @change="filterDatasets"
-        >
-        </v-text-field>
+          @update:modelValue="filterDatasets"
+        />
       </v-col>
     </v-row>
   </v-form>
 </template>
 
-<script>
-import Vue from "vue";
-import { Component } from "nuxt-property-decorator";
-import { filterDatasetMetadata } from "@/store/actions";
+<script setup lang="ts">
+import { ref, computed } from "vue";
+import { useMetadataStore } from "@/stores/metadata";
 
-@Component({})
-class Search extends Vue {
-  currentYear = new Date().getFullYear();
-  keywordSearchQuery = "";
-  startYear = 1;
-  endYear = this.currentYear;
-  selectedVariableClasses = [];
-  minYear = 1;
-  maxYear = this.currentYear;
+const metadataStore = useMetadataStore();
+const currentYear = new Date().getFullYear();
 
-  get datasets() {
-    return this.$api().metadata.filteredDatasets;
-  }
+const keywordSearchQuery = ref("");
+const startYear = ref(1);
+const endYear = ref(currentYear);
+const selectedVariableClasses = ref<string[]>([]);
+const minYear = 1;
+const maxYear = currentYear;
 
-  get startYearRules() {
-    return [
-      (v) =>
-        v >= this.minYear ||
-        `Please enter a valid start year after ${this.minYear}`,
-      (v) =>
-        v <= this.endYear ||
-        `Please enter a valid start year before ${this.endYear}`,
-    ];
-  }
+const datasets = computed(() => metadataStore.filteredDatasets);
 
-  get endYearRules() {
-    return [
-      (v) =>
-        v >= this.startYear ||
-        `Please enter a valid end year after ${this.startYear}`,
-      (v) =>
-        v <= this.maxYear ||
-        `Please enter a valid end year before ${this.maxYear}`,
-    ];
-  }
+const startYearRules = computed(() => [
+  (v: number) => v >= minYear || `Please enter a valid start year after ${minYear}`,
+  (v: number) => v <= endYear.value || `Please enter a valid start year before ${endYear.value}`,
+]);
 
-  get variableClasses() {
-    const datasets = this.$api().metadata.allDatasetMetadata;
-    const variableClassSet = new Set();
-    // use a Set to dedupe the variable classes
-    for (const dataset of datasets) {
-      for (const variable of dataset.variables) {
-        variableClassSet.add(variable.class);
-      }
+const endYearRules = computed(() => [
+  (v: number) => v >= startYear.value || `Please enter a valid end year after ${startYear.value}`,
+  (v: number) => v <= maxYear || `Please enter a valid end year before ${maxYear}`,
+]);
+
+const variableClasses = computed(() => {
+  const variableClassSet = new Set<string>();
+  for (const dataset of metadataStore.allDatasetMetadata as any[]) {
+    for (const variable of (dataset.variables || [])) {
+      variableClassSet.add(variable.class);
     }
-    return Array.from(variableClassSet);
   }
+  return Array.from(variableClassSet);
+});
 
-  filterDatasets() {
-    // update the store with the selected variable classes, year range, and optional
-    // keyword query which will be applied as a filter across the available datasets
-    const criteria = {
-      selectedVariableClasses: this.selectedVariableClasses,
-      yearStart: this.startYear,
-      yearEnd: this.endYear,
-      query: this.keywordSearchQuery,
-    };
-    console.log("filtering datasets with criteria: ", criteria);
-    filterDatasetMetadata(this.$api(), criteria);
-  }
-
-  clearSearchQuery() {
-    this.keywordSearchQuery = "";
-    this.filterDatasets();
-  }
+function filterDatasets() {
+  const criteria = {
+    selectedVariableClasses: selectedVariableClasses.value,
+    yearStart: startYear.value,
+    yearEnd: endYear.value,
+    query: keywordSearchQuery.value,
+  };
+  metadataStore.setFilterCriteria(criteria);
 }
 
-export default Search;
+function clearSearchQuery() {
+  keywordSearchQuery.value = "";
+  filterDatasets();
+}
 </script>
 
 <style scoped></style>

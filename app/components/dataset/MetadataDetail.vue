@@ -2,37 +2,27 @@
   <v-card-text>
     <div v-for="(label, attr) in metadataAttributes" :key="attr" class="py-0">
       <span class="text-h5">{{ label }}</span>
-      <span v-html="$md.render(metadata[attr])"></span>
+      <span v-html="$md.render(renderableMetadata(attr))"></span>
     </div>
     <VariableList :variables="metadata.variables" />
   </v-card-text>
 </template>
 
-<script>
-import Vue from "vue";
-import { Component, Prop } from "nuxt-property-decorator";
+<script setup lang="ts">
 import VariableList from "@/components/dataset/VariableList.vue";
 
-@Component({
-  name: "MetadataDetail",
-  components: {
-    VariableList,
-  },
-})
-class MetadataDetail extends Vue {
-  @Prop()
-  metadata;
+const props = defineProps<{ metadata: Record<string, any> }>();
 
-  get metadataAttributes() {
-    return {
-      uncertainty: "Uncertainty",
-      methodSummary: "Method Summary",
-      originator: "Originator",
-      references: "References",
-      contactInformation: "Contact Information",
-    };
-  }
+const metadataAttributes: Record<string, string> = {
+  uncertainty: "Uncertainty",
+  methodSummary: "Method Summary",
+  originator: "Originator",
+  references: "References",
+  contactInformation: "Contact Information",
+};
+
+function renderableMetadata(attr: string): string {
+  const value = props.metadata?.[attr];
+  return typeof value === "string" ? value : "";
 }
-
-export default MetadataDetail;
 </script>

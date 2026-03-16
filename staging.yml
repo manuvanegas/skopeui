@@ -1,9 +1,8 @@
-version: '3.8'
 services:
   web:
     environment:
       NODE_ENV: "production"
     command: >-
-      sh -c "yarn build && yarn start"
+      sh -c "npm run build && npm run preview"
     ports:
       - "3000:3000"

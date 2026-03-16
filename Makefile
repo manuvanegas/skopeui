@@ -50,11 +50,15 @@ docker-compose.yml: base.yml config.mk $(DEPLOY_ENVIRONMENT).yml $(LOG_DATA_PATH
 
 .PHONY: buildprod
 buildprod: build
-	docker compose run --rm web yarn build
+	docker compose run --rm web npm run build
 
 .PHONY: lint
 lint: build
-	docker compose run --rm web yarn lintfix
+	docker compose run --rm web npm run lintfix
+
+.PHONY: test
+test: build
+	docker compose run --rm web npm exec vitest run
 
 .PHONY: deploy
 deploy: build

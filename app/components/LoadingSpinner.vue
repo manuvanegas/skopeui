@@ -17,12 +17,4 @@
   </v-row>
 </template>
 
-<script>
-import Vue from "vue";
-import { Component } from "nuxt-property-decorator";
 
-@Component({})
-class LoadingSpinner extends Vue {}
-
-export default LoadingSpinner;
-</script>

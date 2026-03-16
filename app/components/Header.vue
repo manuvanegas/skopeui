@@ -1,10 +1,10 @@
 <template>
-  <v-app-bar src="/header.png" dense light shrink-on-scroll app>
+  <v-app-bar src="/header.png">
     <template #img="{ props }">
       <v-img v-bind="props" cover></v-img>
     </template>
-    <v-app-bar-nav-icon light @click.stop="toggleNavigationDrawer()">
-      <v-icon color="primary" x-large>fas fa-bars</v-icon>
+    <v-app-bar-nav-icon @click.stop="toggleNavigationDrawer()">
+      <v-icon color="primary" x-large>mdi-menu</v-icon>
     </v-app-bar-nav-icon>
     <v-app-bar-title>
       <a
@@ -18,47 +18,32 @@
         Synthesizing Knowledge of Past Environments
       </div>
     </v-app-bar-title>
-    <template v-if="$vuetify.breakpoint.mdAndUp">
+    <template v-if="display.mdAndUp">
       <v-spacer />
       <LoadAnalysis />
     </template>
   </v-app-bar>
 </template>
-<script>
-import Vue from "vue";
-import { Component } from "nuxt-property-decorator";
+<script setup lang="ts">
+import { computed } from "vue";
+import { useDisplay } from "vuetify";
+import { useRoute } from "vue-router";
 import LoadAnalysis from "@/components/dataset/LoadAnalysis.vue";
-import _ from "lodash";
+import { useAppStore } from "@/stores/app";
 
-@Component({
-  components: {
-    LoadAnalysis,
-  },
-})
-class Header extends Vue {
-  stepNames = _.clone(this.$api().app.stepNames);
-  steps = _.clone(this.$api().app.steps);
+const route = useRoute();
+const appStore = useAppStore();
+const display = useDisplay();
 
-  // --------- GETTERS ---------
-  get drawer() {
-    return this.$api().app.isVisible;
-  }
+const stepNames = computed(() => appStore.stepNames);
+const steps = computed(() => appStore.steps);
+const currentStepIndex = computed(() =>
+  stepNames.value.findIndex((x) => x === (route.name as string))
+);
 
-  get currentStepName() {
-    return this.steps[this.currentStepIndex].label;
-  }
-
-  get currentStepIndex() {
-    return this.stepNames.findIndex((x) => x === this.$route.name);
-  }
-
-  // --------- METHODS ---------
-
-  toggleNavigationDrawer() {
-    this.$api().app.toggleNavigationDrawer();
-  }
+function toggleNavigationDrawer() {
+  appStore.toggleNavigationDrawer();
 }
-export default Header;
 </script>
 <style lang="scss" scoped>
 .skope-title {

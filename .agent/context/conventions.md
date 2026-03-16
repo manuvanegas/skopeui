@@ -30,6 +30,15 @@
   - `.agent/handoffs/current.md`
   - Optional checkpoint in `.agent/checkpoints/`
 
+## Node Command Execution
+- Always run all `npm` and `npx` invocations inside the `web` container.
+- Do not run `npm`/`npx` in the host shell.
+- Preferred pattern: `docker compose run --rm web npm <command>`.
+- Examples:
+  - Tests: `docker compose run --rm web npm exec vitest run`
+  - Build: `docker compose run --rm web npm run build`
+  - Lint: `docker compose run --rm web npm run lintfix`
+
 ## Agent File Update Workflow
 
 ### When to Update

@@ -10,17 +10,17 @@ EXPOSE 3000
 
 WORKDIR /code
 
-COPY package.json yarn.lock /code/
+COPY package.json package-lock.json /code/
 RUN set -ex; \
     if [ "$NODE_ENV" = "production" ]; then \
-        yarn install --no-cache --frozen-lockfile --production; \
+        npm ci --omit=dev; \
     elif [ "$NODE_ENV" = "test" ]; then \
-        yarn install --no-cache --frozen-lockfile; \
+        npm ci; \
     else \
-        yarn install; \
+        npm install; \
     fi; \
-    yarn cache clean;
+    npm cache clean --force;
 
 COPY . /code
 
-CMD ["yarn", "dev"]
+CMD ["npm", "run", "dev"]

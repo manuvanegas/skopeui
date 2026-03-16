@@ -10,31 +10,21 @@
       >
         {{ alert.message }}
         <v-btn icon class="float-right" @click="dismiss(index)"
-          ><v-icon>fas fa-times-circle</v-icon></v-btn
+          ><v-icon>mdi-close-circle</v-icon></v-btn
         >
       </v-alert>
     </v-col>
   </v-row>
 </template>
 
-<script>
-import { Component } from "nuxt-property-decorator";
-import Vue from "vue";
+<script setup lang="ts">
+import { computed } from "vue";
+import { useMessagesStore } from "@/stores/messages";
 
-@Component()
-class Messages extends Vue {
-  // --------- GETTERS ---------
+const messagesStore = useMessagesStore();
+const messages = computed(() => messagesStore.messages);
 
-  get messages() {
-    return this.$api().messages.messages;
-  }
-
-  // --------- METHODS ---------
-
-  dismiss(index) {
-    this.$api().messages.dismiss(index);
-  }
+function dismiss(index: number) {
+  messagesStore.dismiss(index);
 }
-
-export default Messages;
 </script>
