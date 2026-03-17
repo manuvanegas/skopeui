@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { summarize, toISODate } from "@/store/stats";
+import area from "@turf/area";
 
 const DEFAULT_MAX_PROCESSING_TIME = 10000;
 
@@ -29,6 +30,17 @@ const NO_STUDY_AREA_STATUS = {
     },
   ],
 };
+
+function selectedAreaInSquareKmFromGeoJson(geoJson: unknown): string {
+  if (!geoJson) return "0.00";
+  try {
+    const squareMeters = area(geoJson as any);
+    if (!Number.isFinite(squareMeters) || squareMeters <= 0) return "0.00";
+    return (squareMeters / 1e6).toFixed(2);
+  } catch {
+    return "0.00";
+  }
+}
 
 type DatasetVariable = { id: string | null } & Record<string, unknown>;
 
@@ -127,7 +139,7 @@ export const useDatasetStore = defineStore("dataset", {
     setGeoJson(geoJson: unknown) {
       this.geoJson = geoJson;
       this.hasGeoJson = geoJson != null;
-      this.selectedAreaInSquareKm = this.hasGeoJson ? this.selectedAreaInSquareKm : "0.00";
+      this.selectedAreaInSquareKm = selectedAreaInSquareKmFromGeoJson(geoJson);
       this.canHandleTimeSeriesRequest = !!this.metadata && this.hasGeoJson && !!this.variable?.id;
       this.timeSeriesRequestData = this.defaultApiRequestData;
     },
@@ -135,6 +147,8 @@ export const useDatasetStore = defineStore("dataset", {
       this.geoJson = null;
       this.hasGeoJson = false;
       this.canHandleTimeSeriesRequest = false;
+      this.selectedAreaInSquareKm = "0.00";
+      this.timeSeriesRequestData = this.defaultApiRequestData;
     },
     setTimeSeriesLoading() {
       this.timeSeriesRequestStatus = { ...LOADING_STATUS };
@@ -195,6 +209,16 @@ export const useDatasetStore = defineStore("dataset", {
       if (this.timeSeries.x.length === 0) {
         return { x: [], y: [] };
       }
+
+      const selectedRangeLength = end - start + 1;
+      if (this.timeSeries.x.length === selectedRangeLength) {
+        return {
+          x: this.timeSeries.x,
+          y: this.timeSeries.y,
+          name: this.timeSeries.options?.name || "Original",
+        };
+      }
+
       const minOffset = start - min;
       const maxOffset = end - min + 1;
       return {

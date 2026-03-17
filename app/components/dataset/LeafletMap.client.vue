@@ -25,22 +25,6 @@
         >
           Use the draw toolbar on the left to select an area of study.
         </v-alert>
-        <!-- set opacity -->
-        <v-text-field
-          v-if="isVisualize"
-          v-model="opacity"
-          min="0"
-          max="100"
-          type="number"
-          label="Opacity"
-          hint="0-100"
-          append-inner-icon="mdi-plus"
-          prepend-inner-icon="mdi-minus"
-          class="shrink mt-8"
-          :rules="opacityRules"
-          @click:append-inner="increaseOpacity"
-          @click:prepend-inner="decreaseOpacity"
-        />
         <v-spacer></v-spacer>
         <!-- upload geojson -->
         <input
@@ -114,23 +98,6 @@
             :sort-layers="false"
             position="topright"
           />
-          <template v-if="displayRaster">
-            <l-wms-tile-layer
-              v-for="v of variables"
-              ref="wmsLayers"
-              :key="v.id"
-              :base-url="skopeWmsUrl"
-              :layers="fillTemplateYear(v.wmsLayer)"
-              :name="v.name"
-              :crs="defaultCrs"
-              :transparent="true"
-              :opacity="layerOpacity"
-              layer-type="overlay"
-              :visible="v.visible"
-              version="1.3.0"
-              format="image/png"
-            />
-          </template>
           <l-control-scale position="bottomright" />
         </l-map>
       </client-only>
@@ -139,20 +106,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted, shallowRef } from "vue";
+import { computed, watch, onUnmounted } from "vue";
 import { useRoute } from "vue-router";
-import {
-  LEAFLET_PROVIDERS,
-  SKOPE_WMS_ENDPOINT,
-} from "@/store/modules/constants";
+import { LEAFLET_PROVIDERS } from "@/store/modules/constants";
 import circleToPolygon from "circle-to-polygon";
-import queryString from "query-string";
-import fillTemplate from "es6-dynamic-template";
 import { useLegacyStoreActions } from "@/composables/useLegacyStoreActions";
 import { getInitialMapViewport } from "@/composables/useMapInitialViewport";
 import { useAppStore } from "@/stores/app";
 import { useDatasetStore } from "@/stores/dataset";
-import _ from "lodash";
 
 const props = defineProps({
   year: { type: Number, default: 2000 },
@@ -171,17 +132,8 @@ const datasetStore = useDatasetStore();
 const legacyActions = useLegacyStoreActions();
 
 // Reactive UI state
-const isMapReady = ref(false);
-const opacity = ref(50);
-const opacityRules = [
-  (v: any) => (v != null && v >= 0 && v <= 100) || "Please enter an opacity between 0 and 100.",
-];
 const defaultDatasetOpacity = 0.0;
 const defaultBoundsPadding: [number, number] = [3, 3];
-const legendImage = shallowRef<HTMLImageElement | null>(null);
-const legendControl = shallowRef<any>(null);
-const legendPosition = "bottomleft";
-const wmsLayers = ref<any[]>([]);
 
 // Non-reactive mutable Leaflet state (plain variables – deliberately not reactive
 // so Vue does not instrument Leaflet objects).
@@ -195,20 +147,14 @@ let stopGeoJsonWatch: (() => void) | null = null;
 const stepNames = computed(() => appStore.stepNames);
 const metadata = computed(() => datasetStore.metadata);
 const selectedArea = computed(() => datasetStore.selectedAreaInSquareKm);
-const currentStep = computed(() => stepNames.value.findIndex((x) => x === route.name));
+const currentStep = computed(() => stepNames.value.findIndex((x: unknown) => x === route.name));
 const showMapControls = computed(() => currentStep.value >= 1);
-const layerOpacity = computed(() => opacity.value / 100.0);
 const initialMapViewport = computed(() => getInitialMapViewport(metadata.value as any));
 const initialMapZoom = computed(() => initialMapViewport.value.zoom);
 const initialMapCenter = computed(() => initialMapViewport.value.center);
-const skopeWmsUrl = SKOPE_WMS_ENDPOINT;
 const leafletProviders = LEAFLET_PROVIDERS;
-const defaultCrs = computed(() => L?.CRS?.EPSG4326 || "");
 const isSelectArea = computed(() => currentStep.value === 1);
 const isVisualize = computed(() => currentStep.value === 2);
-const variable = computed(() => datasetStore.variable);
-const variables = computed(() => (metadata.value as any)?.variables || []);
-const wmsLayer = computed(() => fillTemplateYear((variable.value as any)?.wmsLayer || ""));
 const areaStyle = computed(() => ({
   fill: !isVisualize.value,
   fillColor: "yellow",
@@ -221,72 +167,6 @@ const areaStyle = computed(() => ({
 
 function isVisible(provider: any) {
   return currentStep.value === provider.visible;
-}
-
-function decreaseOpacity() {
-  opacity.value = _.clamp(opacity.value - 10, 0, 100);
-}
-
-function increaseOpacity() {
-  opacity.value = _.clamp(opacity.value + 10, 0, 100);
-}
-
-function fillTemplateYear(templateString: string) {
-  if (!templateString) return "";
-  const year = (props.year || datasetStore.temporalRangeMax).toString();
-  return fillTemplate(templateString, { year: year.padStart(4, "0") });
-}
-
-function isSkopeLayer(leafletLayer: any) {
-  return (leafletLayer.options.layers || "").startsWith("SKOPE");
-}
-
-function setLegendImage(htmlElement: HTMLImageElement) {
-  legendImage.value = htmlElement;
-}
-
-function generateWmsLegendUrl() {
-  const query = {
-    REQUEST: "GetLegendGraphic",
-    VERSION: "1.0.0",
-    FORMAT: "image/png",
-    LAYER: wmsLayer.value,
-    ENV: `opacity:${layerOpacity.value}`,
-    LEGEND_OPTIONS: "layout:vertical;dx:10",
-  };
-  return skopeWmsUrl + queryString.stringify(query);
-}
-
-function updateWmsLayer() {
-  if (variable.value !== null && wmsLayers.value?.length) {
-    for (const wmsLayerRef of wmsLayers.value) {
-      if (wmsLayerRef.name === (variable.value as any).name) {
-        // @vue-leaflet/vue-leaflet exposes leafletObject; fall back to mapObject for compat
-        const wmsLayerObj = wmsLayerRef.leafletObject ?? wmsLayerRef.mapObject;
-        wmsLayerObj?.setParams({ layers: wmsLayer.value }, false);
-      }
-    }
-  }
-}
-
-function updateWmsLegend() {
-  if (!isMapReady.value || !leafletMap) return;
-  const wmsLegendUrl = generateWmsLegendUrl();
-  if (_.isNil(legendControl.value) && currentStep.value === 2) {
-    const legend = L.control({ position: legendPosition });
-    legend.onAdd = () => {
-      const div = L.DomUtil.create("div", "leaflet-control-wms-legend");
-      const legendImg = L.DomUtil.create("img", "wms-legend", div);
-      legendImg.src = wmsLegendUrl;
-      setLegendImage(legendImg);
-      return div;
-    };
-    legend.addTo(leafletMap);
-    legendControl.value = legend;
-  }
-  if (legendImage.value !== null) {
-    legendImage.value.src = wmsLegendUrl;
-  }
 }
 
 function addDrawToolbar(map: any) {
@@ -392,18 +272,6 @@ function mapReady(map: any) {
   leafletMap = map;
   // Leaflet can calculate a stale size when mounted in flex/grid layouts; force recalc.
   requestAnimationFrame(() => map.invalidateSize(true));
-  const handler = (event: any) => {
-    const leafletLayer = event.layer;
-    if (isSkopeLayer(leafletLayer)) {
-      const v = _.find(variables.value, (x: any) => x.name === event.name) as any;
-      if (v) {
-        datasetStore.setVariable(v.id);
-        leafletLayer.bringToFront();
-      }
-    }
-  };
-  map.on("overlayadd", handler);
-  map.on("baselayerchange", handler);
   addDrawToolbar(map);
   legacyActions.initializeDatasetGeoJson();
   registerToolbarHandlers(map);
@@ -411,7 +279,7 @@ function mapReady(map: any) {
   // Must be stopped manually (created outside a lifecycle hook).
   stopGeoJsonWatch = watch(
     () => datasetStore.geoJson,
-    (gJ) => {
+    (gJ: any) => {
       drawnItems.clearLayers();
       if (gJ === null) {
         disableEditOnly(map);
@@ -421,9 +289,7 @@ function mapReady(map: any) {
     },
     { immediate: true }
   );
-  isMapReady.value = true;
   emit("mapReady", true);
-  updateWmsLegend();
 }
 
 function loadGeoJson(event: Event) {
@@ -455,10 +321,6 @@ function exportSelectedGeometry() {
     }
   }
 }
-
-// Watchers
-watch(() => props.year, updateWmsLayer);
-watch([variable, layerOpacity], updateWmsLegend, { deep: true });
 
 onUnmounted(() => {
   stopGeoJsonWatch?.();

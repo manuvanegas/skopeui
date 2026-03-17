@@ -26,7 +26,7 @@ Core user workflow:
 | UI | Vuetify 3 | same |
 | State | Pinia stores (`app/stores/`) + legacy Vuex-style (`app/store/`) | migrate fully to Pinia |
 | Map | Leaflet + leaflet-draw | **MapLibre GL JS + maplibre-geoman-free** |
-| Raster source | GeoServer WMS | **COG tiles via FastAPI gateway** |
+| Raster source | none in frontend until COG integration lands | **COG tiles via FastAPI gateway** |
 | Package manager | npm (inside Docker container) | same |
 | Test runner | Vitest + `@nuxt/test-utils` | same |
 
@@ -129,7 +129,7 @@ Engine selection precedence:
 1. URL query param `?map_engine=maplibre|leaflet`
 2. `nuxt.config.ts` → `runtimeConfig.public.mapEngine` (defaults to `"leaflet"`)
 
-**Current state:** MapLibrePoc renders, geoman draw/edit/remove is wired, persisted geometry is imported into geoman for editability, and MapLibre now supports base-layer selection parity (CartoDB/Esri providers).
+**Current state:** MapLibrePoc renders, geoman draw/edit/remove is wired for study-area selection, persisted geometry is imported into geoman for editability, MapLibre supports base-layer selection parity (CartoDB/Esri providers), and raster rendering is intentionally absent until the COG tile flow is implemented.
 
 ---
 
@@ -144,13 +144,13 @@ Engine selection precedence:
 | PR-05 | COG raster layer resolver | `MapLibrePoc.client.vue` | not started |
 | PR-06 | Workflow parity (select → visualize → analyze) | page files | not started |
 | PR-07 | Tests for MapLibre mode | `tests/` | in progress (`tests/components/maplibre-baselayer.spec.ts`) |
-| PR-08 | Feature-flag flip, Leaflet removal, GeoServer cleanup | `nuxt.config.ts`, map components | not started |
+| PR-08 | Feature-flag flip, Leaflet removal | `nuxt.config.ts`, map components | not started |
 
 ---
 
 ## COG Raster Architecture (Target)
 
-Replace GeoServer WMS with a **FastAPI COG tile gateway** (in skope-api):
+Implement a **FastAPI COG tile gateway** (in skope-api):
 
 - `GET /v2/map/tilejson/{dataset_id}/{variable_id}?year=&colormap=&rescale=`  
   Returns TileJSON with a `{z}/{x}/{y}.png` tiles template.
@@ -179,7 +179,7 @@ https://skope.s3.us-west-2.amazonaws.com/paleocar_v3/ppt_wateryear/prediction.ti
 - **Geometry persistence** always goes through `useLegacyStoreActions` until the full store migration is complete — do not write localStorage directly.
 - **Single study feature** — the map enforces at most one active geometry at a time.
 - **Circle → polygon conversion** must happen before storing/sending to the API (API does not accept GeoJSON `Circle`).
-- **WMS constants** live in `store/modules/constants.js` (gitignored); use the template to regenerate.
+- Frontend raster work should target TileJSON/COG responses; do not reintroduce legacy raster endpoints.
 - **Route guards** gate visualize/analyze on `hasGeoJson`; do not remove this check.
 
 ---
@@ -190,7 +190,7 @@ When proposing architecture changes:
 - Prefer reversible, feature-flagged rollouts over hard cutovers.
 - Keep Leaflet default until MapLibre parity is fully validated in production.
 - The COG tile gateway (server-side) is preferred over direct S3 COG access from the client — avoids CORS/auth/band-selection complexity at the client.
-- Do not add new WMS/GeoServer dependencies; the migration direction is COG-only.
+- Do not add legacy raster dependencies; the migration direction is COG-only.
 - New page-level features belong in Pinia stores, not the legacy store.
 
 ---

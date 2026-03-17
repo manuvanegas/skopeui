@@ -1,184 +1,158 @@
 <template>
-  <v-card variant="outlined" height="100%" width="100%">
-    <v-card-text style="height: 90%">
-      <v-toolbar variant="flat" class="py-0 my-0">
-        <v-row align="baseline" justify="space-between">
-          <!-- area -->
-          <v-col v-if="showArea" cols="auto" class="d-flex">
-            <v-tooltip location="top" text="Selected area in square kilometers">
-              <template #activator="{ props }">
-                <h3
-                  v-bind="props"
-                  class="font-weight-light text-center pa-2"
-                  style="background-color: #e4e7ef"
-                >
-                  {{ selectedAreaInSquareKm }} km<sup>2</sup>
-                </h3>
-              </template>
-            </v-tooltip>
-            <v-divider vertical class="mx-2"></v-divider>
-            <v-tooltip location="top" text="Total cell area used in this time series calculation">
-              <template #activator="{ props }">
-                <h3
-                  v-bind="props"
-                  class="font-weight-light text-center pa-2"
-                  style="background-color: #e4e7ef"
-                >
-                  {{ totalCellArea }} km<sup>2</sup> ({{ numberOfCells }}
-                  cells)
-                </h3>
-              </template>
-            </v-tooltip>
-          </v-col>
-          <!-- temporal range input -->
-          <v-form v-model="isTemporalRangeValid">
-            <v-col
-              class="d-flex flex-row"
-              cols="auto"
-              @click="enableTemporalRangeEdit"
-            >
-              <!-- temporal range -->
-              <v-text-field
-                v-model.number="formTemporalRangeMin"
-                label="Min Year"
-                :disabled="!isTemporalRangeEditable"
-                :min="minYear"
-                :max="maxYear - 1"
-                type="number"
-                :rules="[validateMinYear]"
-                @keydown.enter="setTemporalRange"
+  <v-card variant="outlined" class="time-series-card">
+    <v-card-text class="time-series-card__content">
+      <div class="time-series-toolbar">
+        <div v-if="showArea" class="time-series-toolbar__group time-series-toolbar__group--metrics">
+          <v-tooltip location="top" text="Selected area in square kilometers">
+            <template #activator="{ props }">
+              <h3
+                v-bind="props"
+                class="font-weight-light text-center pa-2 time-series-metric"
               >
-                <template #append-outer>to</template>
-              </v-text-field>
-              <v-text-field
-                v-model.number="formTemporalRangeMax"
-                :disabled="!isTemporalRangeEditable"
-                class="mx-2"
-                label="Max Year"
-                :hint="timeStepsLabel"
-                persistent-hint
-                :min="minYear + 1"
-                :max="maxYear"
-                :rules="[validateMaxYear]"
-                type="number"
-                @keydown.enter="setTemporalRange"
+                {{ selectedAreaInSquareKm }} km<sup>2</sup>
+              </h3>
+            </template>
+          </v-tooltip>
+          <v-tooltip location="top" text="Total cell area used in this time series calculation">
+            <template #activator="{ props }">
+              <h3
+                v-bind="props"
+                class="font-weight-light text-center pa-2 time-series-metric"
               >
-              </v-text-field>
-              <div class="d-flex flex-column mt-n2">
-                <v-btn
-                  :disabled="!hasTemporalRangeChanges || !isTemporalRangeValid"
-                  size="x-small"
-                  color="secondary"
-                  @click="setTemporalRange"
-                  >Apply</v-btn
-                >
-                <v-btn size="x-small" color="secondary" @click="resetTemporalRange"
-                  >Reset</v-btn
-                >
-              </div>
-            </v-col>
-          </v-form>
-          <!-- step controls -->
-          <v-col v-if="showStepControls" align="right">
-            <v-tooltip location="top" text="Go to the first year of the defined temporal range">
-              <template #activator="{ props }">
-                <v-btn
-                  icon
-                  v-bind="props"
-                  color="accent"
-                  @click="gotoFirstYear"
-                >
-                  <v-icon>mdi-skip-previous</v-icon>
-                </v-btn>
-              </template>
-            </v-tooltip>
-            <v-tooltip location="top" text="Previous year">
-              <template #activator="{ props }">
-                <v-btn
-                  icon
-                  v-bind="props"
-                  color="accent"
-                  @click="previousYear"
-                >
-                  <v-icon>mdi-chevron-left</v-icon>
-                </v-btn>
-              </template>
-            </v-tooltip>
-            <v-tooltip location="top" :text="isAnimationPlaying ? 'Pause animation' : 'Animate layers'">
-              <template #activator="{ props }">
-                <v-btn icon v-bind="props" @click="togglePlay">
-                  <v-icon color="accent">{{ playIcon }}</v-icon>
-                </v-btn>
-              </template>
-            </v-tooltip>
-            <v-tooltip location="top" text="Next year">
-              <template #activator="{ props }">
-                <v-btn
-                  icon
-                  v-bind="props"
-                  color="accent"
-                  @click="nextYear"
-                >
-                  <v-icon>mdi-chevron-right</v-icon>
-                </v-btn>
-              </template>
-            </v-tooltip>
-            <v-tooltip location="top" text="Go to the last year of the defined temporal range">
-              <template #activator="{ props }">
-                <v-btn
-                  icon
-                  v-bind="props"
-                  color="accent"
-                  @click="gotoLastYear"
-                >
-                  <v-icon>mdi-skip-next</v-icon>
-                </v-btn>
-              </template>
-            </v-tooltip>
-          </v-col>
-          <v-col v-if="showArea" cols="auto" align="right">
-            <v-tooltip location="top" text="Return to Select Area">
-              <template #activator="{ props }">
-                <v-btn
-                  v-bind="props"
-                  :to="selectAreaLocation"
-                  class="mb-4 mx-3"
-                  color="accent"
-                  size="small"
-                >
-                  <v-icon size="small">mdi-map-marker</v-icon>
-                </v-btn>
-              </template>
-            </v-tooltip>
-          </v-col>
-        </v-row>
-      </v-toolbar>
-      <!-- time series plot -->
-      <client-only placeholder="Loading...">
-        <template v-if="timeSeriesRequestStatus.status !== 'success'">
-          <v-alert
-            v-for="(message, index) in timeSeriesRequestStatus.messages"
-            :key="index"
-            :type="message.type"
+                {{ totalCellArea }} km<sup>2</sup> ({{ numberOfCells }} cells)
+              </h3>
+            </template>
+          </v-tooltip>
+        </div>
+
+        <v-form
+          v-model="isTemporalRangeValid"
+          class="time-series-toolbar__group time-series-toolbar__range"
+          @click="enableTemporalRangeEdit"
+        >
+          <v-text-field
+            v-model.number="formTemporalRangeMin"
+            class="time-series-range-field"
+            label="Min Year"
+            :disabled="!isTemporalRangeEditable"
+            :min="minYear"
+            :max="maxYear - 1"
+            type="number"
+            :rules="[validateMinYear]"
+            @keydown.enter="setTemporalRange"
           >
-            {{ message.value }}
-          </v-alert>
-        </template>
-        <Plotly
-          ref="plot"
-          class="time-series"
-          :data="timeSeriesData"
-          :layout="layoutMetadata"
-          :options="options"
-          @click="updatePlotlyYear"
-        />
-      </client-only>
+            <template #append-outer>to</template>
+          </v-text-field>
+          <v-text-field
+            v-model.number="formTemporalRangeMax"
+            class="time-series-range-field"
+            label="Max Year"
+            :disabled="!isTemporalRangeEditable"
+            :hint="timeStepsLabel"
+            persistent-hint
+            :min="minYear + 1"
+            :max="maxYear"
+            :rules="[validateMaxYear]"
+            type="number"
+            @keydown.enter="setTemporalRange"
+          />
+          <div class="time-series-range-buttons">
+            <v-btn
+              :disabled="!hasTemporalRangeChanges || !isTemporalRangeValid"
+              size="x-small"
+              color="secondary"
+              @click="setTemporalRange"
+            >
+              Apply
+            </v-btn>
+            <v-btn size="x-small" color="secondary" @click="resetTemporalRange">
+              Reset
+            </v-btn>
+          </div>
+        </v-form>
+
+        <div v-if="showStepControls" class="time-series-toolbar__group time-series-toolbar__group--actions">
+          <v-tooltip location="top" text="Go to the first year of the defined temporal range">
+            <template #activator="{ props }">
+              <v-btn icon v-bind="props" color="accent" @click="gotoFirstYear">
+                <v-icon>mdi-skip-previous</v-icon>
+              </v-btn>
+            </template>
+          </v-tooltip>
+          <v-tooltip location="top" text="Previous year">
+            <template #activator="{ props }">
+              <v-btn icon v-bind="props" color="accent" @click="previousYear">
+                <v-icon>mdi-chevron-left</v-icon>
+              </v-btn>
+            </template>
+          </v-tooltip>
+          <v-tooltip location="top" :text="isAnimationPlaying ? 'Pause animation' : 'Animate layers'">
+            <template #activator="{ props }">
+              <v-btn icon v-bind="props" @click="togglePlay">
+                <v-icon color="accent">{{ playIcon }}</v-icon>
+              </v-btn>
+            </template>
+          </v-tooltip>
+          <v-tooltip location="top" text="Next year">
+            <template #activator="{ props }">
+              <v-btn icon v-bind="props" color="accent" @click="nextYear">
+                <v-icon>mdi-chevron-right</v-icon>
+              </v-btn>
+            </template>
+          </v-tooltip>
+          <v-tooltip location="top" text="Go to the last year of the defined temporal range">
+            <template #activator="{ props }">
+              <v-btn icon v-bind="props" color="accent" @click="gotoLastYear">
+                <v-icon>mdi-skip-next</v-icon>
+              </v-btn>
+            </template>
+          </v-tooltip>
+        </div>
+
+        <div v-if="showArea" class="time-series-toolbar__group time-series-toolbar__group--actions">
+          <v-tooltip location="top" text="Return to Select Area">
+            <template #activator="{ props }">
+              <v-btn
+                v-bind="props"
+                :to="selectAreaLocation"
+                color="accent"
+                size="small"
+              >
+                <v-icon size="small">mdi-map-marker</v-icon>
+              </v-btn>
+            </template>
+          </v-tooltip>
+        </div>
+      </div>
+
+      <div class="time-series-plot-shell">
+        <client-only placeholder="Loading...">
+          <template v-if="timeSeriesRequestStatus.status !== 'success'">
+            <v-alert
+              v-for="(message, index) in timeSeriesRequestStatus.messages"
+              :key="index"
+              :type="message.type"
+              class="mb-2"
+            >
+              {{ message.value }}
+            </v-alert>
+          </template>
+          <Plotly
+            ref="plotlyRef"
+            class="time-series"
+            :data="timeSeriesData"
+            :layout="layoutMetadata"
+            :options="options"
+            @click="updatePlotlyYear"
+          />
+        </client-only>
+      </div>
     </v-card-text>
   </v-card>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch, onMounted, defineAsyncComponent } from "vue";
 import _ from "lodash";
 import { useRoute } from "vue-router";
 import { useDatasetStore } from "@/stores/dataset";
@@ -279,6 +253,7 @@ const shapes = computed(() => {
 });
 
 const layoutMetadata = computed(() => ({
+  autosize: true,
   margin: { b: 60, t: 10, pad: 2 },
   showlegend: hasMultipleTimeSeries.value,
   legend: { x: 1, y: 0.5 },
@@ -289,6 +264,7 @@ const layoutMetadata = computed(() => ({
 }));
 
 const options = computed(() => ({
+  displaylogo: false,
   modeBarButtonsToRemove: ["toImage"],
   responsive: true,
 }));
@@ -301,6 +277,27 @@ const selectAreaLocation = computed(() => ({
   name: "dataset-id",
   params: { id: (route.params.id ?? "") as string },
 }));
+
+function getPlotlyApi() {
+  const plotlyInstance = plotlyRef.value as any;
+  if (!plotlyInstance) {
+    return null;
+  }
+
+  if (typeof plotlyInstance.toImage === "function" || typeof plotlyInstance.update === "function") {
+    return plotlyInstance;
+  }
+
+  if (plotlyInstance.$?.exposed) {
+    return plotlyInstance.$.exposed;
+  }
+
+  if (plotlyInstance.$?.subTree?.component?.exposed) {
+    return plotlyInstance.$.subTree.component.exposed;
+  }
+
+  return null;
+}
 
 // Methods
 function enableTemporalRangeEdit() {
@@ -380,8 +377,9 @@ function togglePlay() {
 }
 
 async function getTimeSeriesPlotImage() {
-  const svg = await plotlyRef.value?.toImage({ format: "svg", height: 600, width: 1200 });
-  const png = await plotlyRef.value?.toImage({ format: "png", height: 600, width: 1200 });
+  const plotlyApi = getPlotlyApi();
+  const svg = await plotlyApi?.toImage({ format: "svg", height: 600, width: 1200 });
+  const png = await plotlyApi?.toImage({ format: "png", height: 600, width: 1200 });
   return { png, svg };
 }
 
@@ -410,15 +408,94 @@ watch(
 );
 
 watch(timeSeriesData, (data) => {
-  plotlyRef.value?.update(data, layoutMetadata.value);
+  getPlotlyApi()?.update(data, layoutMetadata.value);
 });
 
 watch(layoutMetadata, (layout) => {
-  plotlyRef.value?.update(timeSeriesData.value, layout);
+  getPlotlyApi()?.update(timeSeriesData.value, layout);
 });
 </script>
 <style>
-.time-series {
+.time-series-card {
+  width: 100%;
   height: 100%;
+  min-width: 0;
+}
+
+.time-series-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  min-height: 0;
+}
+
+.time-series-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.time-series-toolbar__group {
+  min-width: 0;
+}
+
+.time-series-toolbar__group--metrics {
+  display: flex;
+  flex: 1 1 280px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.time-series-toolbar__range {
+  display: flex;
+  flex: 1 1 340px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.time-series-toolbar__group--actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.time-series-metric {
+  background-color: #e4e7ef;
+}
+
+.time-series-range-field {
+  flex: 1 1 140px;
+  min-width: 140px;
+  max-width: 180px;
+}
+
+.time-series-range-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 2px;
+}
+
+.time-series-plot-shell {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.time-series {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 320px;
+}
+
+@media all and (max-width: 960px) {
+  .time-series-range-field {
+    max-width: none;
+  }
 }
 </style>

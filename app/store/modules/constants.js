@@ -1,15 +1,12 @@
 import { find } from "lodash";
 import {
   API_HOST_URL,
-  GEOSERVER_HOST_URL,
   BUILD_ID,
 } from "@/store/modules/_constants";
 import { toISODate } from "@/store/stats";
 
-export const WMS_SERVER_URI = "geoserver/SKOPE/wms?";
 export const DEFAULT_CENTERED_SMOOTHING_WIDTH = 11;
 export const DEFAULT_MAX_PROCESSING_TIME = 10000; // in ms
-export const SKOPE_WMS_ENDPOINT = `${GEOSERVER_HOST_URL}/${WMS_SERVER_URI}`;
 export const TIMESERIES_ENDPOINT = `${API_HOST_URL}/timeseries`;
 export const METADATA_ENDPOINT = `${API_HOST_URL}/metadata`;
 export const LEAFLET_PROVIDERS = [

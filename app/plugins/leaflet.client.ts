@@ -4,7 +4,6 @@ import {
   LTileLayer,
   LRectangle,
   LControlLayers,
-  LWmsTileLayer,
   LControlScale,
 } from "@vue-leaflet/vue-leaflet";
 
@@ -17,7 +16,6 @@ export default defineNuxtPlugin(async (nuxtApp) => {
   nuxtApp.vueApp.component("LTileLayer", LTileLayer);
   nuxtApp.vueApp.component("LRectangle", LRectangle);
   nuxtApp.vueApp.component("LControlLayers", LControlLayers);
-  nuxtApp.vueApp.component("LWmsTileLayer", LWmsTileLayer);
   nuxtApp.vueApp.component("LControlScale", LControlScale);
 
   // Preserve legacy `$L` access pattern during migration.

@@ -1,104 +1,53 @@
 # Active Tasks
 
 ## In Progress
-- (platform) Nuxt 3 migration plan — started 2026-03-14
-  - Scope: migrate SkopeUI from Nuxt 2/Vue 2 to Nuxt 3/Vue 3 while preserving route contracts and dataset workflows.
-  - Related files: `app/nuxt.config.ts`, `app/package.json`, `app/pages/**`, `app/components/**`, `app/stores/**`, `app/plugins/**`, `app/server/index.js`.
-  - Blockers: unresolved class-style components still importing `nuxt-property-decorator`.
-  - Artifact: `.agent/checkpoints/2026-03-14-nuxt3-dependency-compatibility-matrix.md`
-  - Artifact: `.agent/checkpoints/2026-03-14-nuxt3-target-package-draft.md`
-  - Draft manifest: `app/package.nuxt3.draft.json`
-  - Artifact: `.agent/checkpoints/2026-03-14-nuxt3-target-package-resolved.md`
-  - Artifact: `.agent/checkpoints/2026-03-14-nuxt3-config-wiring.md`
-  - Artifact: `.agent/checkpoints/2026-03-14-nuxt3-plugin-migration-scaffold.md`
-  - Artifact: `.agent/checkpoints/2026-03-14-pinia-app-messages-cutover.md`
-  - Artifact: `.agent/checkpoints/2026-03-14-pinia-dataset-cutover.md`
-  - Artifact: `.agent/checkpoints/2026-03-14-pinia-metadata-analysis-cutover.md`
-  - Artifact: `.agent/checkpoints/2026-03-14-direct-pinia-consumer-migration-round1.md`
-  - Artifact: `.agent/checkpoints/2026-03-14-migrated-functionality-tests.md`
-  - Artifact: `.agent/checkpoints/2026-03-14-pinia-parity-and-metadata-consumers-round2.md`
-  - Artifact: `.agent/checkpoints/2026-03-14-dataset-heavy-consumer-migration-round3.md`
-  - Ready manifest: `app/package.nuxt3.ready.json`
-  - Package manager: npm (Yarn removed); `package-lock.json` generated via container.
-  - Security: GHSA-5c6j-r48x-rmvq tracked in `.agent/checkpoints/2026-03-14-nuxt3-package-apply-step.md`.
-  - Tests: migrated-store and api-compat suites passing (12/12).
+- (mapping) MapLibre migration continuation
+  - Scope: complete the Leaflet → MapLibre cutover while keeping the Leaflet fallback available until MapLibre workflow parity is validated.
+  - Current state: basemap selection parity is in place, Geoman draw/edit/remove is wired, visualize mode is intentionally rasterless until the COG tile flow lands.
+  - Related files: `app/components/dataset/Map.client.vue`, `app/components/dataset/MapLibrePoc.client.vue`, `app/components/dataset/LeafletMap.client.vue`, `app/tests/components/maplibre-baselayer.spec.ts`.
+  - Next roadmap item: PR-03 circle normalization.
 
-### Migration Workstreams (Ordered)
-1. Discovery and compatibility inventory
-  - Audit all Nuxt 2-specific APIs (`asyncData`, `fetch`, middleware, plugins, runtime config usage).
-  - Inventory third-party dependencies for Nuxt 3/Vue 3 compatibility.
-  - Produce a gap list with required replacements and risk rating.
+- (visualization) Plotly time-series hardening
+  - Scope: keep the existing Plotly-based analyze/visualize flow stable while trimming unnecessary bundle weight and fixing first-render layout issues.
+  - Current state: local Plotly wrapper uses `plotly.js/lib/core` plus `scatter`, async ref access is hardened, and the `TimeSeriesPlot` toolbar/plot layout has been made responsive.
+  - Related files: `app/components/dataset/PlotlyClient.vue`, `app/components/dataset/TimeSeriesPlot.vue`, `app/pages/dataset/[id]/visualize/[variable].vue`, `app/pages/dataset/[id]/analyze/[variable].vue`.
 
-2. Foundation setup
-  - Create migration branch and add Nuxt 3 baseline (`nuxi`, `nuxt.config.ts`, Nitro defaults).
-  - Define environment/runtime config strategy replacing Nuxt 2 conventions.
-  - Establish lint/typecheck/build commands for the new app shell.
-
-3. Routing and page migration
-  - Port file-based routes to Nuxt 3 conventions (`pages/`, dynamic params, nested routes).
-  - Preserve existing dataset route contracts under `/dataset/:id/*`.
-  - Move page-level data loading to `useAsyncData`/`useFetch` with clear SSR/CSR boundaries.
-
-4. State layer migration
-  - Migrate Vuex modules to Pinia stores (preferred) with one store per domain module.
-  - Keep action/mutation intent through store actions and computed getters.
-  - Add transition adapters where needed to reduce cutover risk.
-
-5. Plugins and middleware migration
-  - Convert plugins to Nuxt 3 plugin format (`defineNuxtPlugin`).
-  - Migrate axios integration to `$fetch` or compatible client abstraction.
-  - Port middleware to route middleware and validate navigation behavior.
-
-6. UI/component migration
-  - Update components to Vue 3 patterns (`setup`, composables, lifecycle changes).
-  - Address Vuetify version strategy and theme token compatibility.
-  - Validate key dataset flows: metadata, analysis, map, time series.
-
-7. Server/runtime migration
-  - Replace/customize `app/server/index.js` behavior for Nitro/server routes as needed.
-  - Validate deployment assumptions in root environment YAML files.
-
-8. Verification and rollout
-  - Run regression suite and targeted manual smoke tests for critical routes.
-  - Execute staged rollout (dev -> staging -> prod) with rollback path.
-  - Record migration checkpoint and handoff notes.
+- (raster) COG transition preparation
+  - Scope: keep the frontend free of legacy WMS/GeoServer runtime paths while preparing for TileJSON/COG-based raster rendering.
+  - Current state: active frontend GeoServer/WMS code has been removed from both map engines, shared constants, and default metadata/config scaffolding.
+  - Next roadmap items: PR-04 COG metadata contract, PR-05 COG raster resolver.
 
 ## Next Up
-- Confirm whether any Hapi runtime behavior must remain externalized
-- Validate staging-like runtime behavior for dataset select/visualize/analyze flows
-- Migrate remaining `nuxt-property-decorator` class-style components to Vue 3-compatible patterns (or temporary compatibility path) to unblock Nuxt production build
-- Keep generated build artifacts isolated in `app/generated/` and out of source control
+- Manually verify visualize first-load sizing, toolbar wrapping, and year-click behavior in a browser.
+- Manually verify analyze export still returns valid PNG/SVG output after the Plotly wrapper resize changes.
+- Implement PR-03 circle normalization before persisted geometry is sent to the API.
+- Extend MapLibre-mode tests once the next workflow-parity increment lands.
 
-## Latest Progress (2026-03-15)
-- Reconfigured Nuxt build output paths:
-  - `buildDir` -> `app/generated/.nuxt`
-  - Nitro output dir -> `app/generated/.output`
-- Added ignore rules so generated output does not pollute source or container contexts:
-  - `app/.gitignore`, `.gitignore`
-  - `app/.dockerignore`, `.dockerignore`
-- Refreshed core agent docs (`.agent/context/*`) for current Nuxt 3 + Pinia + `[id]/[variable]` route conventions.
+## Latest Progress (2026-03-16)
+- Removed active frontend GeoServer/WMS code from:
+  - `app/components/dataset/MapLibrePoc.client.vue`
+  - `app/components/dataset/LeafletMap.client.vue`
+  - `app/plugins/leaflet.client.ts`
+  - `app/store/modules/constants.js`, `app/store/modules/_constants.js.template`, `app/store/modules/metadata.js`
+  - `config.mk.template`, `README.md`
+- Updated visualize mode to render basemap + study area only with `map-engine="maplibre"` and `display-raster="false"`.
+- Hardened `app/components/dataset/TimeSeriesPlot.vue`:
+  - fixed the Plotly child ref/exposed API access path
+  - replaced brittle toolbar height math with a responsive flex layout
+  - enabled autosizing and kept export support intact
+- Optimized `app/components/dataset/PlotlyClient.vue`:
+  - switched to `plotly.js/lib/core` + `scatter`
+  - added `ResizeObserver` and deferred resize scheduling for reliable first render
+- Consolidated handoff workflow to `.agent/handoffs/handoff.md` and removed the redundant `current.md` file.
 
-## Latest Progress (2026-03-14)
-- Completed migration of `app/pages/dataset/_id/analyze/_variable.vue` from `$api()` compat calls to direct Pinia stores (`dataset`, `analysis`, `metadata`).
-- Replaced legacy action-helper usage in that page with local request helpers for metadata and timeseries retrieval.
-- Completed migration of `app/pages/dataset/_id/visualize/_variable.vue` from `$api()` compat calls to direct Pinia stores (`app`, `dataset`, `metadata`) and local timeseries fetch helpers.
-- Added shared interop composable `app/composables/useLegacyStoreActions.ts` and migrated remaining `$api()` consumers (`pages/index.vue`, `pages/dataset/_id/index.vue`, `components/dataset/Map.vue`, `components/dataset/LoadAnalysis.vue`) to direct store/composable usage.
-- Removed `~/plugins/api-compat.ts` from `app/nuxt.config.ts` plugin wiring.
-- Added persistence composable `app/composables/usePersistenceStorage.ts` and migrated all remaining `$warehouse` usage to direct persistence helpers.
-- Removed `~/plugins/warehouse-compat.client.ts` from `app/nuxt.config.ts` plugin wiring.
-- Validation: containerized `npm ci && npm exec vitest run` passed (12/12 tests).
-- Removed retired compatibility assets: `app/plugins/api-compat.ts`, `app/plugins/warehouse-compat.client.ts`.
-- Removed obsolete bridge-only test suite: `app/tests/api-compat.migrated.spec.ts`.
-- Post-cleanup validation: containerized `npm ci && npm exec vitest run` passed (7/7 tests).
-- Staging-like build verification uncovered migration blockers:
-  - legacy Nuxt 2 config auto-selection (resolved by removing `app/nuxt.config.js`)
-  - missing `nuxt-site-config` dependency for `@nuxtjs/robots` (resolved)
-  - unresolved `nuxt-property-decorator` usage across class-style Vue components (open blocker for production build)
-- Validation note: workspace shell currently lacks `npm`/`npx`, so full Vitest execution is blocked in this environment.
+## Validation Snapshot
+- `docker compose -f base.yml -f dev.yml run -T --rm web sh -c "npm install 2>/dev/null && npm exec vitest run tests/pages/visualize-variable.spec.ts tests/pages/analyze-variable.spec.ts"`
+  - `Test Files 2 passed`
+  - `Tests 5 passed`
+- Broader focused suite previously green:
+  - `docker compose -f base.yml -f dev.yml run -T --rm web sh -c "npm install 2>/dev/null && npm exec vitest run tests/components/maplibre-baselayer.spec.ts tests/pages/dataset-id.spec.ts tests/pages/visualize-variable.spec.ts tests/pages/analyze-variable.spec.ts tests/stores.migrated.spec.ts"`
 
-## Definition of Done (per task)
-- All critical dataset routes work under Nuxt 3 with parity on user-facing behavior
-- Store layer is fully migrated or bridge is documented and time-boxed
-- Plugins/middleware/server runtime behavior validated in dev and staging
-- Build/test/lint checks pass in CI for Nuxt 3 branch
-- `.agent/handoffs/current.md` and migration checkpoint are updated
+## Definition of Done (Current Focus)
+- MapLibre workflow parity continues without reintroducing legacy raster code.
+- Plotly visualize/analyze charts render reliably in fresh sessions and preserve export behavior.
+- Active agent state is captured in `.agent/handoffs/handoff.md` and relevant checkpoints.

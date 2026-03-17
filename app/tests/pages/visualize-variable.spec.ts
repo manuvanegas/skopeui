@@ -1,4 +1,5 @@
 import { flushPromises } from "@vue/test-utils";
+import { nextTick } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -27,7 +28,8 @@ vi.mock("vue-router", () => ({
 vi.mock("@/components/dataset/Map.client.vue", () => ({
   default: {
     name: "MapStub",
-    template: '<div data-test="map">map</div>',
+    props: ["mapEngine", "displayRaster"],
+    template: '<div data-test="map" :data-map-engine="mapEngine" :data-display-raster="String(displayRaster)">map</div>',
   },
 }));
 
@@ -104,8 +106,11 @@ describe("route /dataset/:id/visualize/:variable", () => {
 
     await flushPromises();
     const page = wrapper.findComponent(VisualizePage);
+    const map = page.find('[data-test="map"]');
 
     expect(page.findComponent({ name: "MapStub" }).exists()).toBe(true);
+    expect(map.attributes("data-map-engine")).toBe("maplibre");
+    expect(map.attributes("data-display-raster")).toBe("false");
     expect(page.findComponent({ name: "TimeSeriesPlotStub" }).exists()).toBe(true);
   });
 
@@ -119,5 +124,27 @@ describe("route /dataset/:id/visualize/:variable", () => {
     expect(datasetStore.setTimeSeriesLoaded).toHaveBeenCalled();
     expect(global.fetch).toHaveBeenCalled();
     expect(appStore.setVisited).toHaveBeenCalled();
+  });
+
+  it("[behavior] re-requests time-series when temporal/request constraints change", async () => {
+    await mountWithSuspense(VisualizePage, { global: { stubs: layoutStubs } });
+
+    await flushPromises();
+    const initialFetchCalls = (global.fetch as any).mock.calls.length;
+
+    datasetStore.timeSeriesRequestData = {
+      dataset_id: "paleocar",
+      variable_id: "tasmax",
+      selected_area: { type: "FeatureCollection", features: [] },
+      time_range: { gte: "0002-01-01", lte: "0003-01-01" },
+      zonal_statistic: "mean",
+      transform: { type: "NoTransform" },
+      requested_series_options: [{ name: "Original", smoother: { type: "NoSmoother" } }],
+    };
+
+    await nextTick();
+    await flushPromises();
+
+    expect((global.fetch as any).mock.calls.length).toBeGreaterThan(initialFetchCalls);
   });
 });

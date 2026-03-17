@@ -1,2 +1,1 @@
 export const API_HOST_URL = ${SKOPE_API_HOST_URL};
-export const GEOSERVER_HOST_URL = ${SKOPE_GEOSERVER_HOST_URL};

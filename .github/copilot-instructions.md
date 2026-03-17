@@ -9,7 +9,7 @@
 
 Nuxt 3 SPA for spatiotemporal paleoclimate dataset discovery, visualization, and time-series analysis (SKOPE platform).
 
-**Stack:** Nuxt 3 + Vue 3 + TypeScript · Pinia stores · Vuetify 3 · Leaflet (legacy) → MapLibre GL JS + maplibre-geoman-free (target) · COG tile gateway via FastAPI (target, replacing GeoServer WMS).
+**Stack:** Nuxt 3 + Vue 3 + TypeScript · Pinia stores · Vuetify 3 · Leaflet (legacy) → MapLibre GL JS + maplibre-geoman-free (target) · COG tile gateway via FastAPI (target).
 
 **User flow:** search datasets → select dataset → draw study area on map → visualize variable raster → analyze time series.
 
@@ -29,7 +29,7 @@ Nuxt 3 SPA for spatiotemporal paleoclimate dataset discovery, visualization, and
 ### Map engine flag
 
 URL param `?map_engine=maplibre` or `nuxt.config.ts` `public.mapEngine` switches the adapter.
-**Current state:** MapLibrePoc renders, geoman draw/edit/remove is wired, persisted geometry is imported into geoman for editability, and MapLibre now supports base-layer selection parity (CartoDB/Esri providers).
+**Current state:** MapLibrePoc renders, geoman draw/edit/remove is wired, persisted geometry is imported into geoman for editability, MapLibre supports base-layer selection parity (CartoDB/Esri providers), and frontend raster rendering is intentionally absent until the COG tile flow lands.
 
 ### Dev commands (all inside Docker container — npm not on host)
 
@@ -49,11 +49,11 @@ docker compose -f base.yml -f dev.yml up
 - Geometry persistence always through `useLegacyStoreActions` (`saveGeoJson`, `clearGeoJson`, `initializeDatasetGeoJson`).
 - Circle GeoJSON must be converted to polygon before store save / API submission.
 - Route guards gate visualize/analyze on `hasGeoJson` — do not remove.
-- No new WMS/GeoServer dependencies; migrate toward COG-only.
+- No new legacy raster dependencies; migrate toward COG-only.
 
 ### Migration roadmap (PR order)
 
-~~PR-01~~(done) → ~~PR-02~~(done) → PR-03: Circle normalization → PR-04: COG metadata contract → PR-05: COG raster resolver → PR-06: Workflow parity → PR-07: MapLibre-mode tests (in progress: `tests/components/maplibre-baselayer.spec.ts`) → PR-08: Feature-flag flip + Leaflet/GeoServer removal.
+~~PR-01~~(done) → ~~PR-02~~(done) → PR-03: Circle normalization → PR-04: COG metadata contract → PR-05: COG raster resolver → PR-06: Workflow parity → PR-07: MapLibre-mode tests (in progress: `tests/components/maplibre-baselayer.spec.ts`) → PR-08: Feature-flag flip + Leaflet removal.
 
 ### Handoff
 

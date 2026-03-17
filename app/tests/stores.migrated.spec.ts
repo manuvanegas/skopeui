@@ -69,8 +69,27 @@ describe("migrated pinia stores", () => {
     store.setGeoJson({ type: "FeatureCollection", features: [] });
     expect(store.hasGeoJson).toBe(true);
 
+    store.setGeoJson({
+      type: "Feature",
+      properties: {},
+      geometry: {
+        type: "Polygon",
+        coordinates: [
+          [
+            [0, 0],
+            [0, 1],
+            [1, 1],
+            [1, 0],
+            [0, 0],
+          ],
+        ],
+      },
+    });
+    expect(Number(store.selectedAreaInSquareKm)).toBeGreaterThan(0);
+
     store.setGeoJson(null);
     expect(store.hasGeoJson).toBe(false);
+    expect(store.selectedAreaInSquareKm).toBe("0.00");
   });
 
   it("dataset store legacy parity methods update status and derived fields", () => {
@@ -117,6 +136,29 @@ describe("migrated pinia stores", () => {
 
     store.setTimeSeriesNoArea();
     expect(store.timeSeriesRequestStatus.status).toBe("no-area");
+  });
+
+  it("dataset store preserves already constrained time series without double filtering", () => {
+    const store = useDatasetStore();
+
+    store.setMetadata({
+      id: "paleocar",
+      timespan: { period: { gte: "1", lte: "2000" } },
+      variables: [{ id: "ppt", name: "PPT" }],
+    });
+    store.setVariable("ppt");
+    store.setTemporalRange([100, 102]);
+    store.setTimeSeries({
+      timeSeries: { x: [100, 101, 102], y: [4, 5, 6], options: { name: "Original" } },
+      numberOfCells: 2,
+      totalCellArea: 2000000,
+    });
+
+    expect(store.filteredTimeSeries()).toEqual({
+      x: [100, 101, 102],
+      y: [4, 5, 6],
+      name: "Original",
+    });
   });
 
   it("metadata store sets collections and finds by id", () => {

@@ -26,7 +26,7 @@
         sm="12"
         align-self="stretch"
       >
-        <Map :year="yearSelected" />
+        <Map :year="yearSelected" :display-raster="false" map-engine="maplibre" />
       </v-col>
       <!-- time series plot -->
       <v-col
@@ -37,6 +37,8 @@
         align-self="stretch"
       >
         <TimeSeriesPlot
+          :show-area="true"
+          :show-step-controls="true"
           :traces="traces"
           :year-selected="yearSelected"
           @year-selected="setYear"

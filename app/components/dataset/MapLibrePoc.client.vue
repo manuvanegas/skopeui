@@ -35,30 +35,16 @@
           hide-details
           class="mx-2 my-auto basemap-select"
         />
-        <v-text-field
-          v-if="isVisualize"
-          v-model="opacity"
-          min="0"
-          max="100"
-          type="number"
-          label="Opacity"
-          hint="0-100"
-          append-inner-icon="mdi-plus"
-          prepend-inner-icon="mdi-minus"
-          class="shrink mt-8"
-          :rules="opacityRules"
-          @click:append-inner="increaseOpacity"
-          @click:prepend-inner="decreaseOpacity"
-        />
         <v-spacer></v-spacer>
         <input
+          v-if="isSelectArea"
           id="loadGeoJsonFile"
           type="file"
           accept=".geojson"
           style="display: none"
           @change="loadGeoJson"
         />
-        <v-tooltip location="bottom" text="Upload study area from GeoJSON">
+        <v-tooltip v-if="isSelectArea" location="bottom" text="Upload study area from GeoJSON">
           <template #activator="{ props }">
             <v-btn
               size="small"
@@ -72,7 +58,7 @@
             </v-btn>
           </template>
         </v-tooltip>
-        <v-tooltip location="bottom" text="Download selected area as GeoJSON">
+        <v-tooltip v-if="isSelectArea" location="bottom" text="Download selected area as GeoJSON">
           <template #activator="{ props }">
             <v-btn
               size="small"
@@ -103,13 +89,10 @@ import maplibregl from "maplibre-gl";
 import type { Geoman } from "@geoman-io/maplibre-geoman-free";
 import { createGeomanInstance } from "@geoman-io/maplibre-geoman-free";
 import circleToPolygon from "circle-to-polygon";
-import fillTemplate from "es6-dynamic-template";
-import queryString from "query-string";
-import _ from "lodash";
 import { bbox as turfBbox } from "@turf/turf";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "@geoman-io/maplibre-geoman-free/dist/maplibre-geoman.css";
-import { LEAFLET_PROVIDERS, SKOPE_WMS_ENDPOINT } from "@/store/modules/constants";
+import { LEAFLET_PROVIDERS } from "@/store/modules/constants";
 import { useLegacyStoreActions } from "@/composables/useLegacyStoreActions";
 import { getInitialMapViewport } from "@/composables/useMapInitialViewport";
 import { useAppStore } from "@/stores/app";
@@ -128,21 +111,12 @@ const datasetStore = useDatasetStore();
 const legacyActions = useLegacyStoreActions();
 
 const mapContainer = ref<HTMLElement | null>(null);
-const opacity = ref(50);
-const opacityRules = [
-  (v: any) =>
-    (v != null && v >= 0 && v <= 100) || "Please enter an opacity between 0 and 100.",
-];
 
 const stepNames = computed(() => appStore.stepNames);
 const metadata = computed(() => datasetStore.metadata as any);
 const selectedArea = computed(() => datasetStore.selectedAreaInSquareKm);
 const currentStep = computed(() => stepNames.value.findIndex((x: unknown) => x === route.name));
 const isSelectArea = computed(() => currentStep.value === 1);
-const isVisualize = computed(() => currentStep.value === 2);
-const layerOpacity = computed(() => opacity.value / 100.0);
-const variables = computed(() => metadata.value?.variables || []);
-const variable = computed(() => datasetStore.variable as any);
 const initialMapViewport = computed(() => getInitialMapViewport(metadata.value));
 const initialMapZoom = computed(() => initialMapViewport.value.zoom);
 const initialMapCenter = computed(() => initialMapViewport.value.center);
@@ -188,7 +162,7 @@ const mapBaseLayers: MapLibreBaseLayer[] = LEAFLET_PROVIDERS.map((provider: any)
   tiles: providerToMapLibreTiles(provider),
   attribution: provider.attribution,
   visible: provider.visible,
-})).filter((provider) => provider.tiles.length > 0);
+})).filter((provider: MapLibreBaseLayer) => provider.tiles.length > 0);
 
 function getDefaultBaseLayerId(step: number) {
   const matchedByStep = mapBaseLayers.find((provider) => provider.visible === step);
@@ -204,19 +178,15 @@ let map: maplibregl.Map | null = null;
 let gm: Geoman | null = null;
 let ignoreStoreWatch = false;
 let syncDrawQueue: Promise<void> = Promise.resolve();
+let isMapLoaded = false;
+let pendingStudyAreaGeoJson: any = null;
 
-function decreaseOpacity() {
-  opacity.value = _.clamp(opacity.value - 10, 0, 100);
-}
+const STUDY_AREA_SOURCE_ID = "study-area-display";
+const STUDY_AREA_FILL_LAYER_ID = "study-area-display-fill";
+const STUDY_AREA_LINE_LAYER_ID = "study-area-display-outline";
 
-function increaseOpacity() {
-  opacity.value = _.clamp(opacity.value + 10, 0, 100);
-}
-
-function fillTemplateYear(templateString: string) {
-  if (!templateString) return "";
-  const year = (props.year || datasetStore.temporalRangeMax).toString();
-  return fillTemplate(templateString, { year: year.padStart(4, "0") });
+function emptyFeatureCollection() {
+  return { type: "FeatureCollection", features: [] as any[] };
 }
 
 function baseSourceId(baseLayerId: string) {
@@ -228,7 +198,7 @@ function baseLayerId(baseLayerId: string) {
 }
 
 function applyBaseLayerSelection(baseLayerIdValue: string) {
-  if (!map) return;
+  if (!map || !isMapLoaded) return;
   for (const provider of mapBaseLayers) {
     const rasterLayerId = baseLayerId(provider.id);
     if (!map.getLayer(rasterLayerId)) continue;
@@ -362,6 +332,73 @@ function fitToGeoJson(geoJson: any) {
   }
 }
 
+function ensureStudyAreaDisplayLayer() {
+  if (!map) return;
+
+  if (!map.getSource(STUDY_AREA_SOURCE_ID)) {
+    map.addSource(STUDY_AREA_SOURCE_ID, {
+      type: "geojson",
+      data: emptyFeatureCollection() as any,
+    });
+  }
+
+  if (!map.getLayer(STUDY_AREA_FILL_LAYER_ID)) {
+    map.addLayer({
+      id: STUDY_AREA_FILL_LAYER_ID,
+      type: "fill",
+      source: STUDY_AREA_SOURCE_ID,
+      paint: {
+        "fill-color": "#facc15",
+        "fill-opacity": 0.08,
+      },
+    });
+  }
+
+  if (!map.getLayer(STUDY_AREA_LINE_LAYER_ID)) {
+    map.addLayer({
+      id: STUDY_AREA_LINE_LAYER_ID,
+      type: "line",
+      source: STUDY_AREA_SOURCE_ID,
+      paint: {
+        "line-color": "#111827",
+        "line-width": 2,
+      },
+    });
+  }
+}
+
+function bringStudyAreaDisplayToFront() {
+  if (!map || typeof (map as any).moveLayer !== "function") {
+    return;
+  }
+
+  if (!map.getLayer(STUDY_AREA_LINE_LAYER_ID) || !map.getLayer(STUDY_AREA_FILL_LAYER_ID)) {
+    return;
+  }
+
+  map.moveLayer(STUDY_AREA_FILL_LAYER_ID);
+  map.moveLayer(STUDY_AREA_LINE_LAYER_ID);
+}
+
+function updateStudyAreaDisplay(geoJson: any) {
+  if (!map || !isMapLoaded) {
+    pendingStudyAreaGeoJson = geoJson;
+    return;
+  }
+
+  ensureStudyAreaDisplayLayer();
+  const source = map.getSource(STUDY_AREA_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
+  if (!source) return;
+
+  const featureCollection = normalizeGeoJsonForImport(geoJson) || emptyFeatureCollection();
+  source.setData(featureCollection as any);
+  bringStudyAreaDisplayToFront();
+
+  if (featureCollection.features.length > 0) {
+    fitToGeoJson(featureCollection);
+  }
+}
+
 function syncDrawFromStore(geoJson: any) {
   if (!gm) return Promise.resolve();
 
@@ -415,7 +452,7 @@ function handleGmRemove() {
 }
 
 function addMetadataExtentLayer() {
-  if (!map || !metadata.value?.region?.extents) return;
+  if (!map || !isMapLoaded || !metadata.value?.region?.extents) return;
 
   const sourceId = "dataset-region";
   const lineLayerId = "dataset-region-outline";
@@ -443,65 +480,6 @@ function addMetadataExtentLayer() {
     source: sourceId,
     paint: { "line-color": "#4c6ef5", "line-width": 2 },
   });
-}
-
-function wmsTileUrl(layerName: string) {
-  return `${SKOPE_WMS_ENDPOINT}${queryString.stringify({
-    service: "WMS",
-    request: "GetMap",
-    version: "1.1.1",
-    layers: layerName,
-    styles: "",
-    format: "image/png",
-    transparent: true,
-    width: 256,
-    height: 256,
-    srs: "EPSG:3857",
-    bbox: "{bbox-epsg-3857}",
-  })}`;
-}
-
-function refreshRasterLayers() {
-  if (!map || !props.displayRaster) return;
-
-  const existingLayerIds = map
-    .getStyle()
-    .layers?.map((layer: any) => layer.id)
-    .filter((id: string) => id.startsWith("skope-raster-layer-")) || [];
-
-  for (const layerId of existingLayerIds) {
-    map.removeLayer(layerId);
-  }
-
-  const existingSourceIds = Object.keys(map.getStyle().sources || {}).filter((id) =>
-    id.startsWith("skope-raster-source-")
-  );
-
-  for (const sourceId of existingSourceIds) {
-    map.removeSource(sourceId);
-  }
-
-  for (const v of variables.value) {
-    const layerName = fillTemplateYear(v.wmsLayer || "");
-    if (!layerName) continue;
-
-    const sourceId = `skope-raster-source-${v.id}`;
-    const layerId = `skope-raster-layer-${v.id}`;
-
-    map.addSource(sourceId, {
-      type: "raster",
-      tiles: [wmsTileUrl(layerName)],
-      tileSize: 256,
-    });
-
-    map.addLayer({
-      id: layerId,
-      type: "raster",
-      source: sourceId,
-      paint: { "raster-opacity": layerOpacity.value },
-      layout: { visibility: v.visible ? "visible" : "none" },
-    });
-  }
 }
 
 function loadGeoJson(event: Event) {
@@ -549,18 +527,23 @@ onMounted(() => {
 
   map.on("load", async () => {
     if (!map) return;
-
-    gm = await createGeomanInstance(map as any, {});
-    await gm.addControls();
+    isMapLoaded = true;
 
     addMetadataExtentLayer();
-    refreshRasterLayers();
     legacyActions.initializeDatasetGeoJson();
-    await syncDrawFromStore(datasetStore.geoJson);
 
-    (map as any).on("gm:create", handleGmCreate);
-    (map as any).on("gm:editend", handleGmEditEnd);
-    (map as any).on("gm:remove", handleGmRemove);
+    if (isSelectArea.value) {
+      gm = await createGeomanInstance(map as any, {});
+      await gm.addControls();
+      await syncDrawFromStore(datasetStore.geoJson);
+
+      (map as any).on("gm:create", handleGmCreate);
+      (map as any).on("gm:editend", handleGmEditEnd);
+      (map as any).on("gm:remove", handleGmRemove);
+    } else {
+      updateStudyAreaDisplay(pendingStudyAreaGeoJson ?? datasetStore.geoJson);
+      pendingStudyAreaGeoJson = null;
+    }
 
     emit("mapReady", true);
   });
@@ -570,20 +553,13 @@ watch(
   () => datasetStore.geoJson,
   (geoJson: any) => {
     if (ignoreStoreWatch) return;
-    void syncDrawFromStore(geoJson);
+    if (isSelectArea.value) {
+      void syncDrawFromStore(geoJson);
+      return;
+    }
+    updateStudyAreaDisplay(geoJson);
   },
   { deep: true }
-);
-
-watch([variables, () => props.year, layerOpacity], () => {
-  refreshRasterLayers();
-});
-
-watch(
-  () => variable.value?.id,
-  () => {
-    refreshRasterLayers();
-  }
 );
 
 watch(
@@ -595,19 +571,21 @@ watch(
 
 watch(
   () => currentStep.value,
-  (step) => {
+  (step: number) => {
     selectedBaseLayerId.value = getDefaultBaseLayerId(step);
   }
 );
 
 watch(
   () => selectedBaseLayerId.value,
-  (baseLayerIdValue) => {
+  (baseLayerIdValue: string) => {
     applyBaseLayerSelection(baseLayerIdValue);
   }
 );
 
 onUnmounted(() => {
+  isMapLoaded = false;
+  pendingStudyAreaGeoJson = null;
   if (gm) {
     gm.destroy();
     gm = null;

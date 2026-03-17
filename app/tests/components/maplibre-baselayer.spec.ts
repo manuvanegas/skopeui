@@ -164,7 +164,6 @@ vi.mock("@/composables/useMapInitialViewport", () => ({
 }));
 
 vi.mock("@/store/modules/constants", () => ({
-  SKOPE_WMS_ENDPOINT: "https://example.com/wms?",
   LEAFLET_PROVIDERS: [
     {
       name: "CartoDB.Positron",
@@ -306,5 +305,42 @@ describe("MapLibre basemap selector", () => {
 
     expect(carto.layout?.visibility).toBe("visible");
     expect(topo.layout?.visibility).toBe("none");
+  });
+
+  it("[behavior] keeps visualize mode read-only and renders selected area overlay", async () => {
+    mocks.routeState.name = "dataset-id-visualize-variable";
+    mocks.routeState.params = { id: "paleocar", variable: "tasmax" };
+    mocks.datasetStore.geoJson = {
+      type: "Feature",
+      properties: {},
+      geometry: {
+        type: "Polygon",
+        coordinates: [
+          [
+            [0, 0],
+            [0, 1],
+            [1, 1],
+            [1, 0],
+            [0, 0],
+          ],
+        ],
+      },
+    };
+
+    await mount(MapLibrePoc, {
+      global: {
+        stubs: uiStubs,
+      },
+    });
+
+    await flushPromises();
+    await nextTick();
+
+    const map = mocks.mapInstances[0];
+
+    expect(mocks.geomanInstance.addControls).not.toHaveBeenCalled();
+    expect(map.getSource("study-area-display")).toBeDefined();
+    expect(map.getLayer("study-area-display-fill")).toBeDefined();
+    expect(map.getLayer("study-area-display-outline")).toBeDefined();
   });
 });

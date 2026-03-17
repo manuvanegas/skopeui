@@ -14,8 +14,6 @@ Running `make` for the first time will generate a default `config.mk` file that 
 - `DEPLOY_ENVIRONMENT` can be set to `dev`, `staging`, or `prod` (use `dev` for local development)
 - `SKOPE_API_HOST_URL` should point at a SKOPE backend API to serve metadata and timeseries data (e.g., a deployed
   instance of https://github.com/openskope/skope-api/)
-- `SKOPE_GEOSERVER_HOST_URL` should point at a GeoServer instance with SKOPE datasets and geotiff layers preloaded
-  (see https://github.com/openskope/skope-datasets for more details)
 
 Run `make deploy` to redeploy the application with whatever settings are currently defined in `config.mk`
 

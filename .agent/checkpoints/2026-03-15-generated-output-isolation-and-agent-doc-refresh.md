@@ -19,7 +19,7 @@ Status: completed
 - `.agent/context/conventions.md`
 - `.agent/context/domain.md`
 - `.agent/tasks/active.md`
-- `.agent/handoffs/current.md`
+- `.agent/handoffs/handoff.md`
 
 ## Behavior / Contract Impact
 - Build outputs now target:
