@@ -24,6 +24,9 @@ const emit = defineEmits(["mapReady"]);
 const route = useRoute();
 const runtimeConfig = useRuntimeConfig();
 
+console.log("[Map.client] useRoute query:", route.query);
+console.log("[Map.client] runtimeConfig.public.mapEngine:", runtimeConfig.public.mapEngine);
+
 const year = computed(() => props.year);
 const displayRaster = computed(() => props.displayRaster);
 const circleToPolygonEdges = computed(() => props.circleToPolygonEdges);
@@ -37,8 +40,10 @@ const mapEngine = computed(() => {
 
 const mapComponent = computed(() => {
   if (mapEngine.value === "maplibre") {
+    console.log("[Map.client] mapEngine is 'maplibre', using MapLibrePoc");
     return MapLibrePoc;
   }
+  console.log("[Map.client] mapEngine is not 'maplibre', using LeafletMap. mapEngine value:", mapEngine.value);
   return LeafletMap;
 });
 </script>

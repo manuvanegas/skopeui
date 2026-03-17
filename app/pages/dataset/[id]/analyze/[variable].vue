@@ -451,6 +451,7 @@ await useAsyncData(
     );
     timeRange.value.lb.year = datasetStore.minYear;
     timeRange.value.ub.year = datasetStore.maxYear;
+    return true;
   }
 );
 

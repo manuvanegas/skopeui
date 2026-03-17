@@ -129,7 +129,7 @@ Engine selection precedence:
 1. URL query param `?map_engine=maplibre|leaflet`
 2. `nuxt.config.ts` → `runtimeConfig.public.mapEngine` (defaults to `"leaflet"`)
 
-**Current blocker (P0):** MapLibrePoc base map and geoman draw controls are not rendering. Fix this before any downstream COG/geoman work.
+**Current state:** MapLibrePoc renders, geoman draw/edit/remove is wired, persisted geometry is imported into geoman for editability, and MapLibre now supports base-layer selection parity (CartoDB/Esri providers).
 
 ---
 
@@ -137,13 +137,13 @@ Engine selection precedence:
 
 | PR | Scope | Files | Status |
 |---|---|---|---|
-| PR-01 | Restore MapLibre basemap + geoman controls visible | `MapLibrePoc.client.vue`, `package.json` | **BLOCKED — P0** |
-| PR-02 | Draw tools parity (point, polygon, circle) | `MapLibrePoc.client.vue` | not started |
+| PR-01 | Restore MapLibre basemap + geoman controls visible | `MapLibrePoc.client.vue`, `package.json` | **done** |
+| PR-02 | Draw tools parity (point, polygon, circle) | `MapLibrePoc.client.vue` | **done** |
 | PR-03 | Circle → polygon normalization + persistence | `MapLibrePoc.client.vue`, `useLegacyStoreActions.ts`, `stores/dataset.ts` | not started |
 | PR-04 | COG metadata contract extension | `stores/metadata.ts`, `store/modules/metadata.js` | not started |
 | PR-05 | COG raster layer resolver | `MapLibrePoc.client.vue` | not started |
 | PR-06 | Workflow parity (select → visualize → analyze) | page files | not started |
-| PR-07 | Tests for MapLibre mode | `tests/` | not started |
+| PR-07 | Tests for MapLibre mode | `tests/` | in progress (`tests/components/maplibre-baselayer.spec.ts`) |
 | PR-08 | Feature-flag flip, Leaflet removal, GeoServer cleanup | `nuxt.config.ts`, map components | not started |
 
 ---

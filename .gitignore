@@ -204,3 +204,6 @@ dmypy.json
 
 # ctags generated files
 tags
+
+# Agent cached context
+.agent/context/cached_docs/

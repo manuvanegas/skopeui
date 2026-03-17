@@ -149,11 +149,13 @@ async function loadTimeSeries() {
 
 await useAsyncData(
   `visualize-${route.params.id}-${route.params.variable}`,
-  () =>
-    legacyActions.initializeDataset(
+  async () => {
+    await legacyActions.initializeDataset(
       route.params.id as string,
       route.params.variable as string
-    )
+    );
+    return true;
+  }
 );
 
 onMounted(() => {

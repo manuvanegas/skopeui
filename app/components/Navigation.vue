@@ -11,7 +11,6 @@
         :to="locations[index]"
         :disabled="isDisabled(index)"
         :append-icon="isStepComplete(index) ? 'mdi-check-circle-outline' : undefined"
-        active-color="primary"
       />
       <v-divider />
       <v-list-item>

@@ -86,9 +86,10 @@ const visualizeLocation = computed(() => {
   return { name: "dataset-id-visualize-variable", params: { id, variable } };
 });
 
-await useAsyncData(`dataset-${route.params.id}`, () =>
-  legacyActions.initializeDataset(route.params.id as string)
-);
+await useAsyncData(`dataset-${route.params.id}`, async () => {
+  await legacyActions.initializeDataset(route.params.id as string);
+  return true;
+});
 
 useHead(() => ({
   title: (metadata.value as any)?.title || "SKOPE",

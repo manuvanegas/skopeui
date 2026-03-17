@@ -29,12 +29,13 @@ Nuxt 3 SPA for spatiotemporal paleoclimate dataset discovery, visualization, and
 ### Map engine flag
 
 URL param `?map_engine=maplibre` or `nuxt.config.ts` `public.mapEngine` switches the adapter.
-**Current P0 blocker:** MapLibrePoc base map and geoman draw controls are not rendering.
+**Current state:** MapLibrePoc renders, geoman draw/edit/remove is wired, persisted geometry is imported into geoman for editability, and MapLibre now supports base-layer selection parity (CartoDB/Esri providers).
 
 ### Dev commands (all inside Docker container — npm not on host)
 
 ```bash
 docker compose -f base.yml -f dev.yml run --rm web npm run test
+docker compose -f base.yml -f dev.yml run --rm web npm run test:components
 docker compose -f base.yml -f dev.yml run --rm web npm exec vitest run tests/pages/dataset-id.spec.ts
 docker compose -f base.yml -f dev.yml up
 ```
@@ -52,7 +53,7 @@ docker compose -f base.yml -f dev.yml up
 
 ### Migration roadmap (PR order)
 
-PR-01 (P0): Restore MapLibre basemap + geoman controls → PR-02: Draw parity → PR-03: Circle normalization → PR-04: COG metadata contract → PR-05: COG raster resolver → PR-06: Workflow parity → PR-07: MapLibre-mode tests → PR-08: Feature-flag flip + Leaflet/GeoServer removal.
+~~PR-01~~(done) → ~~PR-02~~(done) → PR-03: Circle normalization → PR-04: COG metadata contract → PR-05: COG raster resolver → PR-06: Workflow parity → PR-07: MapLibre-mode tests (in progress: `tests/components/maplibre-baselayer.spec.ts`) → PR-08: Feature-flag flip + Leaflet/GeoServer removal.
 
 ### Handoff
 

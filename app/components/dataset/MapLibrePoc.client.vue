@@ -24,6 +24,17 @@
         >
           Use the draw toolbar on the left to select an area of study.
         </v-alert>
+        <v-select
+          v-model="selectedBaseLayerId"
+          :items="baseLayerOptions"
+          item-title="title"
+          item-value="value"
+          label="Base map"
+          density="compact"
+          variant="outlined"
+          hide-details
+          class="mx-2 my-auto basemap-select"
+        />
         <v-text-field
           v-if="isVisualize"
           v-model="opacity"
@@ -80,9 +91,7 @@
       </v-row>
     </v-toolbar>
     <v-card-text class="map">
-      <client-only placeholder="Loading map, please wait...">
-        <div ref="mapContainer" class="maplibre-map"></div>
-      </client-only>
+      <div ref="mapContainer" class="maplibre-map"></div>
     </v-card-text>
   </v-card>
 </template>
@@ -91,17 +100,16 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import maplibregl from "maplibre-gl";
-import MapboxDraw from "@mapbox/mapbox-gl-draw";
+import type { Geoman } from "@geoman-io/maplibre-geoman-free";
+import { createGeomanInstance } from "@geoman-io/maplibre-geoman-free";
+import circleToPolygon from "circle-to-polygon";
 import fillTemplate from "es6-dynamic-template";
 import queryString from "query-string";
 import _ from "lodash";
 import { bbox as turfBbox } from "@turf/turf";
 import "maplibre-gl/dist/maplibre-gl.css";
-import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
-import {
-  LEAFLET_PROVIDERS,
-  SKOPE_WMS_ENDPOINT,
-} from "@/store/modules/constants";
+import "@geoman-io/maplibre-geoman-free/dist/maplibre-geoman.css";
+import { LEAFLET_PROVIDERS, SKOPE_WMS_ENDPOINT } from "@/store/modules/constants";
 import { useLegacyStoreActions } from "@/composables/useLegacyStoreActions";
 import { getInitialMapViewport } from "@/composables/useMapInitialViewport";
 import { useAppStore } from "@/stores/app";
@@ -139,11 +147,63 @@ const initialMapViewport = computed(() => getInitialMapViewport(metadata.value))
 const initialMapZoom = computed(() => initialMapViewport.value.zoom);
 const initialMapCenter = computed(() => initialMapViewport.value.center);
 
-let map: maplibregl.Map | null = null;
-let draw: MapboxDraw | null = null;
-let ignoreStoreWatch = false;
+type MapLibreBaseLayer = {
+  id: string;
+  name: string;
+  tiles: string[];
+  attribution: string;
+  visible: number | boolean | undefined;
+};
 
-const provider = LEAFLET_PROVIDERS[0];
+function providerNameToId(name: string) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
+
+function resolveSubdomains(provider: any): string[] {
+  if (Array.isArray(provider?.subdomains) && provider.subdomains.length > 0) {
+    return provider.subdomains;
+  }
+  if (typeof provider?.subdomains === "string" && provider.subdomains.length > 0) {
+    return provider.subdomains.split("");
+  }
+  return ["a", "b", "c", "d"];
+}
+
+function providerToMapLibreTiles(provider: any): string[] {
+  const urlTemplate = String(provider?.url || "").replace(/\{r\}/g, "");
+  if (!urlTemplate) return [];
+
+  if (!urlTemplate.includes("{s}")) {
+    return [urlTemplate];
+  }
+
+  return resolveSubdomains(provider).map((subdomain) =>
+    urlTemplate.replace(/\{s\}/g, subdomain)
+  );
+}
+
+const mapBaseLayers: MapLibreBaseLayer[] = LEAFLET_PROVIDERS.map((provider: any) => ({
+  id: providerNameToId(provider.name),
+  name: provider.name,
+  tiles: providerToMapLibreTiles(provider),
+  attribution: provider.attribution,
+  visible: provider.visible,
+})).filter((provider) => provider.tiles.length > 0);
+
+function getDefaultBaseLayerId(step: number) {
+  const matchedByStep = mapBaseLayers.find((provider) => provider.visible === step);
+  return (matchedByStep || mapBaseLayers[0])?.id || "";
+}
+
+const selectedBaseLayerId = ref(getDefaultBaseLayerId(currentStep.value));
+const baseLayerOptions = computed(() =>
+  mapBaseLayers.map((provider) => ({ title: provider.name, value: provider.id }))
+);
+
+let map: maplibregl.Map | null = null;
+let gm: Geoman | null = null;
+let ignoreStoreWatch = false;
+let syncDrawQueue: Promise<void> = Promise.resolve();
 
 function decreaseOpacity() {
   opacity.value = _.clamp(opacity.value - 10, 0, 100);
@@ -159,18 +219,47 @@ function fillTemplateYear(templateString: string) {
   return fillTemplate(templateString, { year: year.padStart(4, "0") });
 }
 
+function baseSourceId(baseLayerId: string) {
+  return `basemap-source-${baseLayerId}`;
+}
+
+function baseLayerId(baseLayerId: string) {
+  return `basemap-layer-${baseLayerId}`;
+}
+
+function applyBaseLayerSelection(baseLayerIdValue: string) {
+  if (!map) return;
+  for (const provider of mapBaseLayers) {
+    const rasterLayerId = baseLayerId(provider.id);
+    if (!map.getLayer(rasterLayerId)) continue;
+    map.setLayoutProperty(
+      rasterLayerId,
+      "visibility",
+      provider.id === baseLayerIdValue ? "visible" : "none"
+    );
+  }
+}
+
 function baseStyle(): maplibregl.StyleSpecification {
+  const activeBaseLayerId = selectedBaseLayerId.value;
+
   return {
     version: 8,
-    sources: {
-      basemap: {
+    sources: mapBaseLayers.reduce((sources: Record<string, maplibregl.SourceSpecification>, provider) => {
+      sources[baseSourceId(provider.id)] = {
         type: "raster",
-        tiles: [provider.url],
+        tiles: provider.tiles,
         tileSize: 256,
         attribution: provider.attribution,
-      },
-    },
-    layers: [{ id: "basemap", type: "raster", source: "basemap" }],
+      };
+      return sources;
+    }, {}),
+    layers: mapBaseLayers.map((provider) => ({
+      id: baseLayerId(provider.id),
+      type: "raster",
+      source: baseSourceId(provider.id),
+      layout: { visibility: provider.id === activeBaseLayerId ? "visible" : "none" },
+    })),
   } as maplibregl.StyleSpecification;
 }
 
@@ -224,6 +313,39 @@ function normalizeGeoJson(geoJson: any): any {
   return null;
 }
 
+function normalizeGeoJsonForImport(geoJson: any): any {
+  const featureCollection = normalizeGeoJson(geoJson);
+  if (!featureCollection) return null;
+
+  return {
+    ...featureCollection,
+    features: featureCollection.features.map((feature: any) => convertCircleToPolygon(feature)),
+  };
+}
+
+function convertCircleToPolygon(feature: any): any {
+  if (!feature?.geometry || feature.geometry.type !== "Circle") return feature;
+
+  const [lon, lat] = feature.geometry.coordinates || [0, 0];
+  const radiusKm = (feature.geometry.radius || 1000) / 1000;
+
+  try {
+    const polygon = circleToPolygon([lon, lat], radiusKm, {
+      numberOfEdges: props.circleToPolygonEdges,
+    });
+    return {
+      ...feature,
+      geometry: polygon.geometry,
+      properties: {
+        ...feature.properties,
+        originalShape: "circle",
+      },
+    };
+  } catch {
+    return feature;
+  }
+}
+
 function fitToGeoJson(geoJson: any) {
   if (!map || !geoJson) return;
   try {
@@ -241,37 +363,55 @@ function fitToGeoJson(geoJson: any) {
 }
 
 function syncDrawFromStore(geoJson: any) {
-  if (!draw) return;
-  ignoreStoreWatch = true;
-  try {
-    draw.deleteAll();
-    const featureCollection = normalizeGeoJson(geoJson);
-    if (featureCollection && featureCollection.features.length > 0) {
-      draw.add(featureCollection as any);
-      fitToGeoJson(featureCollection);
-    }
-  } finally {
-    ignoreStoreWatch = false;
-  }
+  if (!gm) return Promise.resolve();
+
+  const geoJsonToSync = geoJson;
+  syncDrawQueue = syncDrawQueue
+    .catch(() => undefined)
+    .then(async () => {
+      if (!gm) return;
+
+      ignoreStoreWatch = true;
+      try {
+        await gm.features.deleteAll();
+
+        const featureCollection = normalizeGeoJsonForImport(geoJsonToSync);
+        if (featureCollection && featureCollection.features.length > 0) {
+          await gm.features.importGeoJson(featureCollection);
+          fitToGeoJson(featureCollection);
+        }
+      } finally {
+        ignoreStoreWatch = false;
+      }
+    });
+
+  return syncDrawQueue;
 }
 
-function saveDrawSelection() {
-  if (!draw) return;
-  const featureCollection = draw.getAll();
-  if (!featureCollection.features.length) {
-    legacyActions.clearGeoJson();
-    return;
-  }
+function handleGmCreate(event: any) {
+  if (ignoreStoreWatch) return;
 
-  const latestFeature = featureCollection.features[featureCollection.features.length - 1];
-  for (const feature of featureCollection.features.slice(0, -1)) {
-    if (feature.id != null) {
-      draw.delete(String(feature.id));
-    }
-  }
+  const geoJson = event.feature?.getGeoJson?.();
+  if (!geoJson) return;
 
-  legacyActions.saveGeoJson(latestFeature);
-  fitToGeoJson(latestFeature);
+  const normalizedFeature = convertCircleToPolygon(geoJson);
+  legacyActions.saveGeoJson(normalizedFeature);
+  fitToGeoJson(normalizedFeature);
+}
+
+function handleGmEditEnd(event: any) {
+  if (ignoreStoreWatch) return;
+
+  const geoJson = event.feature?.getGeoJson?.();
+  if (!geoJson) return;
+
+  const normalizedFeature = convertCircleToPolygon(geoJson);
+  legacyActions.saveGeoJson(normalizedFeature);
+}
+
+function handleGmRemove() {
+  if (ignoreStoreWatch) return;
+  legacyActions.clearGeoJson();
 }
 
 function addMetadataExtentLayer() {
@@ -396,13 +536,6 @@ function exportSelectedGeometry() {
 onMounted(() => {
   if (!mapContainer.value) return;
 
-  const drawClasses = (MapboxDraw as any).constants.classes;
-  drawClasses.CANVAS = "maplibregl-canvas";
-  drawClasses.CONTROL_BASE = "maplibregl-ctrl";
-  drawClasses.CONTROL_PREFIX = "maplibregl-ctrl-";
-  drawClasses.CONTROL_GROUP = "maplibregl-ctrl-group";
-  drawClasses.ATTRIBUTION = "maplibregl-ctrl-attrib";
-
   map = new maplibregl.Map({
     container: mapContainer.value,
     style: baseStyle(),
@@ -414,59 +547,30 @@ onMounted(() => {
   map.addControl(new maplibregl.NavigationControl(), "top-right");
   map.addControl(new maplibregl.ScaleControl(), "bottom-right");
 
-  draw = new MapboxDraw({
-    displayControlsDefault: false,
-    controls: {
-      polygon: true,
-      trash: true,
-    },
-    styles: [
-      {
-        id: "gl-draw-polygon-fill",
-        type: "fill",
-        filter: ["all", ["==", "$type", "Polygon"], ["!=", "mode", "static"]],
-        paint: {
-          "fill-color": "#ffec99",
-          "fill-outline-color": "#ffd43b",
-          "fill-opacity": 0.18,
-        },
-      },
-      {
-        id: "gl-draw-polygon-stroke",
-        type: "line",
-        filter: ["all", ["==", "$type", "Polygon"], ["!=", "mode", "static"]],
-        layout: {
-          "line-cap": "round",
-          "line-join": "round",
-        },
-        paint: {
-          "line-color": "#ffd43b",
-          "line-width": 3,
-        },
-      },
-    ],
-  });
+  map.on("load", async () => {
+    if (!map) return;
 
-  map.addControl(draw, "top-left");
+    gm = await createGeomanInstance(map as any, {});
+    await gm.addControls();
 
-  map.on("load", () => {
     addMetadataExtentLayer();
     refreshRasterLayers();
     legacyActions.initializeDatasetGeoJson();
-    syncDrawFromStore(datasetStore.geoJson);
+    await syncDrawFromStore(datasetStore.geoJson);
+
+    (map as any).on("gm:create", handleGmCreate);
+    (map as any).on("gm:editend", handleGmEditEnd);
+    (map as any).on("gm:remove", handleGmRemove);
+
     emit("mapReady", true);
   });
-
-  map.on("draw.create", saveDrawSelection);
-  map.on("draw.update", saveDrawSelection);
-  map.on("draw.delete", saveDrawSelection);
 });
 
 watch(
   () => datasetStore.geoJson,
   (geoJson: any) => {
     if (ignoreStoreWatch) return;
-    syncDrawFromStore(geoJson);
+    void syncDrawFromStore(geoJson);
   },
   { deep: true }
 );
@@ -489,11 +593,28 @@ watch(
   }
 );
 
+watch(
+  () => currentStep.value,
+  (step) => {
+    selectedBaseLayerId.value = getDefaultBaseLayerId(step);
+  }
+);
+
+watch(
+  () => selectedBaseLayerId.value,
+  (baseLayerIdValue) => {
+    applyBaseLayerSelection(baseLayerIdValue);
+  }
+);
+
 onUnmounted(() => {
+  if (gm) {
+    gm.destroy();
+    gm = null;
+  }
   if (map) {
     map.remove();
     map = null;
-    draw = null;
   }
 });
 </script>
@@ -515,7 +636,12 @@ onUnmounted(() => {
   width: 100%;
 }
 
-:deep(.maplibregl-ctrl.mapboxgl-ctrl-group) {
+.basemap-select {
+  max-width: 220px;
+  min-width: 180px;
+}
+
+:deep(.maplibregl-ctrl-group) {
   margin-top: 8px;
 }
 
