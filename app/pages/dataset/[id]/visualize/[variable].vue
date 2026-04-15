@@ -157,7 +157,8 @@ await useAsyncData(
       route.params.variable as string
     );
     return true;
-  }
+  },
+  { server: false }
 );
 
 onMounted(() => {

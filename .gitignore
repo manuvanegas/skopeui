@@ -1,5 +1,6 @@
 # backups
 *~
+.DS_Store
 # docker generated things
 _citation.*
 config.mk

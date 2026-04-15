@@ -89,7 +89,7 @@ const visualizeLocation = computed(() => {
 await useAsyncData(`dataset-${route.params.id}`, async () => {
   await legacyActions.initializeDataset(route.params.id as string);
   return true;
-});
+},{ server: false });
 
 useHead(() => ({
   title: (metadata.value as any)?.title || "SKOPE",

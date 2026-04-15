@@ -71,7 +71,8 @@ const { error: metadataLoadError } = await useAsyncData(
       console.error("Failed to load dataset metadata", error);
       return false;
     }
-  }
+  },
+  { server: false }
 );
 
 if (metadataLoadError.value != null) {
