@@ -7,8 +7,10 @@ import { toISODate } from "@/store/stats";
 
 export const DEFAULT_CENTERED_SMOOTHING_WIDTH = 11;
 export const DEFAULT_MAX_PROCESSING_TIME = 10000; // in ms
-export const TIMESERIES_ENDPOINT = `${API_HOST_URL}/timeseries`;
 export const METADATA_ENDPOINT = `${API_HOST_URL}/metadata`;
+export const TIMESERIES_SUBMIT_ENDPOINT = `${API_HOST_URL}/timeseries/extract`;
+export const TIMESERIES_STATUS_ENDPOINT = `${API_HOST_URL}/timeseries/status`;
+export const TIMESERIES_REFINE_ENDPOINT = `${API_HOST_URL}/timeseries/analyze`;
 export const LEAFLET_PROVIDERS = [
   {
     name: "CartoDB.Positron",

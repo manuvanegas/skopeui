@@ -57,10 +57,10 @@ import TimeSeriesPlot from "@/components/dataset/TimeSeriesPlot.vue";
 import SubHeader from "@/components/dataset/SubHeader.vue";
 import LoadingSpinner from "@/components/LoadingSpinner.vue";
 import _ from "lodash";
-import { TIMESERIES_ENDPOINT } from "@/store/modules/constants";
 import { extractYear } from "@/store/stats";
 import { useAppStore } from "@/stores/app";
 import { useDatasetStore } from "@/stores/dataset";
+import { useAnalysisStore } from "@/stores/analysis";
 import { useLegacyStoreActions } from "@/composables/useLegacyStoreActions";
 
 definePageMeta({
@@ -71,6 +71,7 @@ definePageMeta({
 const route = useRoute();
 const appStore = useAppStore();
 const datasetStore = useDatasetStore();
+const analysisStore = useAnalysisStore();
 const legacyActions = useLegacyStoreActions();
 
 const yearSelected = ref(1500);
@@ -111,11 +112,10 @@ async function updateTimeSeries(data: any) {
   }
   datasetStore.setTimeSeriesLoading();
   try {
-    const response = await requestJson(TIMESERIES_ENDPOINT, {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-    const originalSeries = response.series[0];
+    const jobId = await legacyActions.submitTimeSeriesRequest(data);
+    const resultsBundle = await legacyActions.pollTimeSeriesStatus(jobId);
+    analysisStore.setJobId(jobId);
+    const originalSeries = resultsBundle.result.series[0];
     const timeSeries = {
       x: _.range(
         extractYear(originalSeries.time_range.gte),
@@ -126,17 +126,23 @@ async function updateTimeSeries(data: any) {
     };
     datasetStore.setTimeSeries({
       timeSeries,
-      numberOfCells: response.n_cells,
-      totalCellArea: response.area,
+      numberOfCells: resultsBundle.result.n_cells,
+      totalCellArea: resultsBundle.result.area,
     });
     datasetStore.setTimeSeriesLoaded();
   } catch (e: any) {
+
+    console.error("updateTimeSeries caught:", e); 
+
     datasetStore.clearTimeSeries();
     if (e.response) {
       const { status, data: responseData } = e.response;
+      const detail = Array.isArray(responseData.detail)
+      ? responseData.detail
+      : [{ msg: responseData.detail }];
       if (status === 504) datasetStore.setTimeSeriesTimeout();
-      else if (status >= 500) datasetStore.setTimeSeriesServerError(responseData.detail || []);
-      else if (status >= 400) datasetStore.setTimeSeriesBadRequest(responseData.detail || []);
+      else if (status >= 500) datasetStore.setTimeSeriesServerError(detail || []);
+      else if (status >= 400) datasetStore.setTimeSeriesBadRequest(detail || []);
     } else {
       datasetStore.setTimeSeriesTimeout();
     }

@@ -156,12 +156,12 @@ import { toISODate, extractYear } from "@/store/stats";
 import {
   buildReadme,
   DEFAULT_CENTERED_SMOOTHING_WIDTH,
-  TIMESERIES_ENDPOINT,
   SMOOTHING_OPTIONS,
   TRANSFORM_OPTIONS,
 } from "@/store/modules/constants";
 import { useAnalysisStore } from "@/stores/analysis";
 import { useDatasetStore } from "@/stores/dataset";
+import { useMessagesStore } from "@/stores/messages";
 import { useLegacyStoreActions } from "@/composables/useLegacyStoreActions";
 import _ from "lodash";
 import JSZip from "jszip";
@@ -173,6 +173,7 @@ const route = useRoute();
 const { mdAndDown } = useDisplay();
 const analysisStore = useAnalysisStore();
 const datasetStore = useDatasetStore();
+const messageStore = useMessagesStore();
 const legacyActions = useLegacyStoreActions();
 const { $download } = useNuxtApp() as any;
 
@@ -317,13 +318,32 @@ async function retrieveAnalysis(data: any) {
   ]);
   analysisStore.setWaitingForResponse(true);
   try {
-    const response = await requestJson(TIMESERIES_ENDPOINT, {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
+    const baselineMissingMessage = "Baseline time series data missing. Please go back to the Select Area page to load the data first.";
+    const jobId = analysisStore.jobId;
+    let response;
+    if (jobId) {
+      response = await legacyActions.refineTimeSeriesAnalysis(jobId, data);
+    } else{
+      throw new Error(baselineMissingMessage);
+    }
     analysisStore.setResponse(response);
-  } catch (e) {
-    analysisStore.setResponseError(e);
+  } catch (e: any) {
+    if (e.response) {
+      const { status, data: responseData } = e.response;
+      const detail = Array.isArray(responseData.detail)
+      ? responseData.detail
+      : [{ msg: responseData.detail }];
+      if (status === 404 || status === 422) {
+        messageStore.error(baselineMissingMessage);
+      } else if (status === 504) {
+        messageStore.error("The analysis request timed out. Please try adjusting the parameters to reduce the size of the request, or try again later when the server load is lower.");
+      }
+      else if (status >= 500) {
+        messageStore.error("An error occurred on the server while processing the analysis request. Please try again later.");
+      }
+    } else {
+      messageStore.error(e.message || "An unknown error occurred while retrieving analysis results.");
+    }
   } finally {
     analysisStore.setWaitingForResponse(false);
   }
