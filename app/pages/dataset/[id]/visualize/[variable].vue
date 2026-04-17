@@ -61,6 +61,7 @@ import { extractYear } from "@/store/stats";
 import { useAppStore } from "@/stores/app";
 import { useDatasetStore } from "@/stores/dataset";
 import { useAnalysisStore } from "@/stores/analysis";
+import { useMessagesStore } from "@/stores/messages";
 import { useLegacyStoreActions } from "@/composables/useLegacyStoreActions";
 
 definePageMeta({
@@ -72,6 +73,7 @@ const route = useRoute();
 const appStore = useAppStore();
 const datasetStore = useDatasetStore();
 const analysisStore = useAnalysisStore();
+const messageStore = useMessagesStore();
 const legacyActions = useLegacyStoreActions();
 
 const yearSelected = ref(1500);
@@ -89,22 +91,6 @@ function setYear(year: number) {
   yearSelected.value = year;
 }
 
-async function requestJson(url: string, options: RequestInit = {}) {
-  const response = await fetch(url, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    ...options,
-  });
-  if (!response.ok) {
-    const responseData = await response
-      .json()
-      .catch(() => ({ detail: [{ msg: response.statusText }] }));
-    const error: any = new Error(`Request failed with status ${response.status}`);
-    error.response = { status: response.status, data: responseData };
-    throw error;
-  }
-  return response.json();
-}
-
 async function updateTimeSeries(data: any) {
   if (!datasetStore.canHandleTimeSeriesRequest) {
     datasetStore.setTimeSeriesNoArea();
@@ -112,10 +98,13 @@ async function updateTimeSeries(data: any) {
   }
   datasetStore.setTimeSeriesLoading();
   try {
-    const jobId = await legacyActions.submitTimeSeriesRequest(data);
-    const resultsBundle = await legacyActions.pollTimeSeriesStatus(jobId);
-    analysisStore.setJobId(jobId);
-    const originalSeries = resultsBundle.result.series[0];
+    const varId = route.params.variable as string;
+    console.log("Requesting time series with varId:", varId);
+    const jobId = datasetStore.jobIds?.[varId];
+    // console.log("Requesting time series with data:", data, "and jobId:", jobId);
+    const {newJobId, response} = await legacyActions.resolveTimeSeries(jobId, data);
+    datasetStore.setJobId(varId, newJobId);
+    const originalSeries = response.series[0];
     const timeSeries = {
       x: _.range(
         extractYear(originalSeries.time_range.gte),
@@ -126,14 +115,11 @@ async function updateTimeSeries(data: any) {
     };
     datasetStore.setTimeSeries({
       timeSeries,
-      numberOfCells: resultsBundle.result.n_cells,
-      totalCellArea: resultsBundle.result.area,
+      numberOfCells: response.n_cells,
+      totalCellArea: response.area,
     });
     datasetStore.setTimeSeriesLoaded();
   } catch (e: any) {
-
-    console.error("updateTimeSeries caught:", e); 
-
     datasetStore.clearTimeSeries();
     if (e.response) {
       const { status, data: responseData } = e.response;
@@ -141,10 +127,10 @@ async function updateTimeSeries(data: any) {
       ? responseData.detail
       : [{ msg: responseData.detail }];
       if (status === 504) datasetStore.setTimeSeriesTimeout();
-      else if (status >= 500) datasetStore.setTimeSeriesServerError(detail || []);
-      else if (status >= 400) datasetStore.setTimeSeriesBadRequest(detail || []);
+      else if (status >= 500) datasetStore.setTimeSeriesServerError(detail);
+      else if (status >= 400) datasetStore.setTimeSeriesBadRequest(detail);
     } else {
-      datasetStore.setTimeSeriesTimeout();
+      messageStore.error(e.message || "An unknown error occurred while retrieving analysis results. Please go back to the Select Area and try again.");
     }
   }
 }

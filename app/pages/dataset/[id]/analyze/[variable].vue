@@ -293,22 +293,6 @@ function smoothingHint(smooth: string) {
   }
 }
 
-async function requestJson(url: string, options: RequestInit = {}) {
-  const response = await fetch(url, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    ...options,
-  });
-  if (!response.ok) {
-    const responseData = await response
-      .json()
-      .catch(() => ({ detail: [{ msg: response.statusText }] }));
-    const error: any = new Error(`Request failed with status ${response.status}`);
-    error.response = { status: response.status, data: responseData };
-    throw error;
-  }
-  return response.json();
-}
-
 async function retrieveAnalysis(data: any) {
   if (Object.values(data).some((v) => v == undefined)) return;
   datasetStore.setGeoJson(data.selected_area);
@@ -316,16 +300,12 @@ async function retrieveAnalysis(data: any) {
     extractYear(data.time_range.gte),
     extractYear(data.time_range.lte),
   ]);
-  analysisStore.setWaitingForResponse(true);
+  datasetStore.setTimeSeriesLoading();
   try {
-    const baselineMissingMessage = "Baseline time series data missing. Please go back to the Select Area page to load the data first.";
-    const jobId = analysisStore.jobId;
-    let response;
-    if (jobId) {
-      response = await legacyActions.refineTimeSeriesAnalysis(jobId, data);
-    } else{
-      throw new Error(baselineMissingMessage);
-    }
+    const varId = route.params.variable as string;
+    const jobId = datasetStore.jobIds?.[varId];
+    const {newJobId, response} = await legacyActions.resolveTimeSeries(jobId, data);
+    datasetStore.setJobId(varId, newJobId);
     analysisStore.setResponse(response);
   } catch (e: any) {
     if (e.response) {
@@ -333,19 +313,14 @@ async function retrieveAnalysis(data: any) {
       const detail = Array.isArray(responseData.detail)
       ? responseData.detail
       : [{ msg: responseData.detail }];
-      if (status === 404 || status === 422) {
-        messageStore.error(baselineMissingMessage);
-      } else if (status === 504) {
-        messageStore.error("The analysis request timed out. Please try adjusting the parameters to reduce the size of the request, or try again later when the server load is lower.");
-      }
-      else if (status >= 500) {
-        messageStore.error("An error occurred on the server while processing the analysis request. Please try again later.");
-      }
+      if (status === 504) datasetStore.setTimeSeriesTimeout();
+      else if (status >= 500) datasetStore.setTimeSeriesServerError(detail);
+      else if (status >= 400) datasetStore.setTimeSeriesBadRequest(detail);
     } else {
-      messageStore.error(e.message || "An unknown error occurred while retrieving analysis results.");
+      messageStore.error(e.message || "An unknown error occurred while retrieving analysis results. Please go back to the Select Area and try again.");
     }
   } finally {
-    analysisStore.setWaitingForResponse(false);
+    datasetStore.setTimeSeriesLoaded();
   }
 }
 

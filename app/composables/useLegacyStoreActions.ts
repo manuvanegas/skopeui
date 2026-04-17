@@ -103,6 +103,8 @@ export function useLegacyStoreActions() {
   function saveGeoJson(geoJson: unknown) {
     persistenceStorage.set(datasetStore.geoJsonKey, geoJson);
     datasetStore.setGeoJson(geoJson);
+    datasetStore.clearJobIds();
+    datasetStore.clearTimeSeries();
 
     if (!_.isEmpty(analysisStore.requestData)) {
       analysisStore.setGeoJson(geoJson);
@@ -175,6 +177,24 @@ export function useLegacyStoreActions() {
     });
   }
 
+  async function resolveTimeSeries(existingJobId: string | undefined, requestData: Record<string, any>) {
+    if (existingJobId) {
+      try {
+        const response = await refineTimeSeriesAnalysis(existingJobId, requestData);
+        return {newJobId: existingJobId, response: response};
+      } catch (error: any) {
+        if (error.response?.status !== 404 && error.response?.status !== 422) {
+          throw error;
+        }
+      }
+    }
+    // if no existing job or error status is 404 or 422 (job if not found or invalid), submit a new request
+    const newJobId = await submitTimeSeriesRequest(requestData);
+    const response = await pollTimeSeriesStatus(newJobId);
+    const result = response.result
+    return {newJobId, response: result};
+  }
+
   return {
     loadAllDatasetMetadata,
     initializeDataset,
@@ -182,8 +202,6 @@ export function useLegacyStoreActions() {
     clearGeoJson,
     saveGeoJson,
     loadRequestData,
-    submitTimeSeriesRequest,
-    pollTimeSeriesStatus,
-    refineTimeSeriesAnalysis,
+    resolveTimeSeries,
   };
 }

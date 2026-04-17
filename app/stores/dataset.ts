@@ -73,6 +73,7 @@ export const useDatasetStore = defineStore("dataset", {
       mean: "N/A",
       median: "N/A",
     } as Record<string, unknown>,
+    jobIds: {} as Record<string, string>,
   }),
   getters: {
     geoJsonKey: (state) => {
@@ -149,6 +150,12 @@ export const useDatasetStore = defineStore("dataset", {
       this.canHandleTimeSeriesRequest = false;
       this.selectedAreaInSquareKm = "0.00";
       this.timeSeriesRequestData = this.defaultApiRequestData;
+    },
+    setJobId(varId: string, jobId: string) {
+      this.jobIds[varId] = jobId;
+    },
+    clearJobIds() {
+      this.jobIds = {};
     },
     setTimeSeriesLoading() {
       this.timeSeriesRequestStatus = { ...LOADING_STATUS };

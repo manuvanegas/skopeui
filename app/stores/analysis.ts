@@ -19,7 +19,6 @@ export const useAnalysisStore = defineStore("analysis", {
     timeseries: [] as any[],
     requestData: {} as Record<string, unknown>,
     responseError: {} as Record<string, unknown>,
-    jobId: null as string | null,
   }),
   getters: {
     derivedTimeseries: (state) => {
@@ -59,8 +58,5 @@ export const useAnalysisStore = defineStore("analysis", {
     setResponseError(error: Record<string, unknown>) {
       this.responseError = error;
     },
-    setJobId(jobId: string | null) {
-      this.jobId = jobId;
-    }
   },
 });
