@@ -26,7 +26,7 @@
         sm="12"
         align-self="stretch"
       >
-        <Map :year="yearSelected" :display-raster="false" map-engine="maplibre" />
+        <Map :year="yearSelected" :display-raster="true" map-engine="maplibre" />
       </v-col>
       <!-- time series plot -->
       <v-col
@@ -148,6 +148,7 @@ await useAsyncData(
       route.params.id as string,
       route.params.variable as string
     );
+    yearSelected.value = datasetStore.temporalRangeMin;
     return true;
   },
   { server: false }
@@ -166,7 +167,6 @@ onMounted(() => {
     },
     { immediate: true }
   );
-  yearSelected.value = datasetStore.temporalRangeMin;
   appStore.setVisited();
 });
 

@@ -92,14 +92,17 @@ import circleToPolygon from "circle-to-polygon";
 import { bbox as turfBbox } from "@turf/turf";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "@geoman-io/maplibre-geoman-free/dist/maplibre-geoman.css";
-import { LEAFLET_PROVIDERS } from "@/store/modules/constants";
+import {
+  LEAFLET_PROVIDERS,
+  TILES_ENDPOINT
+} from "@/store/modules/constants";
 import { useLegacyStoreActions } from "@/composables/useLegacyStoreActions";
 import { getInitialMapViewport } from "@/composables/useMapInitialViewport";
 import { useAppStore } from "@/stores/app";
 import { useDatasetStore } from "@/stores/dataset";
 
 const props = defineProps({
-  year: { type: Number, default: 2000 },
+  step: { type: Number, default: 2000 },
   displayRaster: { type: Boolean, default: true },
   circleToPolygonEdges: { type: Number, default: 32 },
 });
@@ -120,6 +123,8 @@ const isSelectArea = computed(() => currentStep.value === 1);
 const initialMapViewport = computed(() => getInitialMapViewport(metadata.value));
 const initialMapZoom = computed(() => initialMapViewport.value.zoom);
 const initialMapCenter = computed(() => initialMapViewport.value.center);
+
+const cogBaseUrl = computed(getCogBaseUrl);
 
 type MapLibreBaseLayer = {
   id: string;
@@ -181,6 +186,9 @@ let syncDrawQueue: Promise<void> = Promise.resolve();
 let isMapLoaded = false;
 let pendingStudyAreaGeoJson: any = null;
 
+const COG_SOURCE_ID = "cog-source";
+const COG_LAYER_ID = "cog-layer";
+const FILL_LAYER_ID = "dataset-region-fill";
 const STUDY_AREA_SOURCE_ID = "study-area-display";
 const STUDY_AREA_FILL_LAYER_ID = "study-area-display-fill";
 const STUDY_AREA_LINE_LAYER_ID = "study-area-display-outline";
@@ -231,6 +239,76 @@ function baseStyle(): maplibregl.StyleSpecification {
       layout: { visibility: provider.id === activeBaseLayerId ? "visible" : "none" },
     })),
   } as maplibregl.StyleSpecification;
+}
+
+function getCogBaseUrl(): string | null {
+  if (!props.displayRaster || !route.params.variable) return null;
+  const datasetId = route.params.id;
+  const varId = route.params.variable;
+  return `${TILES_ENDPOINT}/${datasetId}/${varId}`;
+}
+
+function getCogFullUrl(baseUrl, step) {
+  if (datasetStore.variable.min == null || datasetStore.variable.max == null){
+    console.warn(`Variable ${datasetStore.variable?.id} is missing min/max — falling back to rescale 0,100`)
+  } 
+  const min = datasetStore.variable?.min ?? 0;
+  const max = datasetStore.variable?.max * 0.9 ?? 100;
+  const urlStep = step.toString().padStart(4, "0"); // TODO: Add flexibility for different time resolutions
+  return `${baseUrl}/${urlStep}/{z}/{x}/{y}?colormap=rain&rescale=${min},${max}`; // TODO: Add colormap flexibility
+}
+
+function addCogRasterLayer(step: number) {
+  if (!map || !isMapLoaded) return;
+  if (!cogBaseUrl.value) return;
+  const cogUrl = getCogFullUrl(cogBaseUrl.value, step);
+  if (map.getLayer(COG_LAYER_ID)) map.removeLayer(COG_LAYER_ID);
+  if (map.getSource(COG_SOURCE_ID)) map.removeSource(COG_SOURCE_ID);
+
+  const extents = metadata.value?.region?.extents;
+  const nw = extents?.[0];
+  const se = extents?.[1];
+  let bounds
+  if (Array.isArray(nw) && Array.isArray(se)) {
+    const [north, west] = nw;
+    const [south, east] = se;
+    bounds = [west, south, east, north];
+  } else {
+    bounds = undefined;
+  }
+
+  map.addSource(COG_SOURCE_ID, {
+    type: "raster",
+    tiles: [cogUrl],
+    tileSize: 128,
+    ...(bounds && { bounds }),
+  })
+
+  map.addLayer({
+    id: COG_LAYER_ID,
+    type: "raster",
+    source: COG_SOURCE_ID,
+    paint: { "raster-opacity": 0.7 },
+  },
+    FILL_LAYER_ID,
+  );
+}
+
+function removeCogRasterLayer() {
+  if (!map || !isMapLoaded) return;
+  if (map.getLayer(COG_LAYER_ID)) map.removeLayer(COG_LAYER_ID);
+  if (map.getSource(COG_SOURCE_ID)) map.removeSource(COG_SOURCE_ID);
+}
+
+function updateRasterLayer(step: number) {
+  if (!map || !isMapLoaded) return;
+  if (!cogBaseUrl.value) return;
+  if (map.getSource(COG_SOURCE_ID)) {
+    const cogSource = map.getSource(COG_SOURCE_ID) as maplibregl.RasterTileSource;
+    cogSource.setTiles([getCogFullUrl(cogBaseUrl.value, step)]);
+  } else {
+    addCogRasterLayer(step);
+  }
 }
 
 function mapExtentPolygon(extents: any): any {
@@ -456,10 +534,9 @@ function addMetadataExtentLayer() {
 
   const sourceId = "dataset-region";
   const lineLayerId = "dataset-region-outline";
-  const fillLayerId = "dataset-region-fill";
 
   if (map.getLayer(lineLayerId)) map.removeLayer(lineLayerId);
-  if (map.getLayer(fillLayerId)) map.removeLayer(fillLayerId);
+  if (map.getLayer(FILL_LAYER_ID)) map.removeLayer(FILL_LAYER_ID);
   if (map.getSource(sourceId)) map.removeSource(sourceId);
 
   map.addSource(sourceId, {
@@ -468,7 +545,7 @@ function addMetadataExtentLayer() {
   });
 
   map.addLayer({
-    id: fillLayerId,
+    id: FILL_LAYER_ID,
     type: "fill",
     source: sourceId,
     paint: { "fill-color": "#f0f4ff", "fill-opacity": 0.05 },
@@ -532,6 +609,8 @@ onMounted(() => {
     addMetadataExtentLayer();
     legacyActions.initializeDatasetGeoJson();
 
+    addCogRasterLayer(props.step);
+
     if (isSelectArea.value) {
       gm = await createGeomanInstance(map as any, {});
       await gm.addControls();
@@ -582,6 +661,23 @@ watch(
     applyBaseLayerSelection(baseLayerIdValue);
   }
 );
+
+watch(
+  () => props.step,
+  (step: number) => {
+    updateRasterLayer(step);
+  }
+)
+
+watch(
+  cogBaseUrl,
+  (url) => {
+    removeCogRasterLayer();
+    if (url) {
+      addCogRasterLayer(props.step);
+    }
+  }
+)
 
 onUnmounted(() => {
   isMapLoaded = false;
