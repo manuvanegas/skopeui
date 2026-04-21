@@ -362,17 +362,19 @@ function previousYear() {
   setYear(_.clamp((props.yearSelected ?? 0) - 1, temporalRangeMin.value, temporalRangeMax.value));
 }
 
+function advanceAnimation() {
+  if (!isAnimationPlaying.value) return;
+  if ((props.yearSelected ?? 0) >= temporalRangeMax.value) {
+    isAnimationPlaying.value = false;
+    return;
+  }
+  nextYear();
+}
+
 function togglePlay() {
   isAnimationPlaying.value = !isAnimationPlaying.value;
   if (isAnimationPlaying.value) {
-    const interval = setInterval(() => {
-      if (isAnimationPlaying.value && (props.yearSelected ?? 0) < temporalRangeMax.value) {
-        nextYear();
-      } else {
-        isAnimationPlaying.value = false;
-        clearInterval(interval);
-      }
-    }, animationSpeed.value);
+    advanceAnimation();  // kick off first step; map drives the rest via advanceAnimation()
   }
 }
 
@@ -383,7 +385,7 @@ async function getTimeSeriesPlotImage() {
   return { png, svg };
 }
 
-defineExpose({ getTimeSeriesPlotImage });
+defineExpose({ getTimeSeriesPlotImage, advanceAnimation });
 
 onMounted(() => {
   localTemporalRangeMin.value = selectedTemporalRange.value[0];

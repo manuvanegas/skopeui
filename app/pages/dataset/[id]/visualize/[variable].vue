@@ -26,7 +26,7 @@
         sm="12"
         align-self="stretch"
       >
-        <Map :year="yearSelected" :display-raster="true" map-engine="maplibre" />
+        <Map ref="mapRef" :year="yearSelected" :display-raster="true" map-engine="maplibre" @step-ready="onStepReady" />
       </v-col>
       <!-- time series plot -->
       <v-col
@@ -37,6 +37,7 @@
         align-self="stretch"
       >
         <TimeSeriesPlot
+          ref="timeSeriesPlotRef"
           :show-area="true"
           :show-step-controls="true"
           :traces="traces"
@@ -77,6 +78,8 @@ const messageStore = useMessagesStore();
 const legacyActions = useLegacyStoreActions();
 
 const yearSelected = ref(1500);
+const mapRef = ref();
+const timeSeriesPlotRef = ref();
 let stopTimeSeriesWatch: (() => void) | null = null;
 
 const hasValidStudyArea = computed(() => datasetStore.hasGeoJson);
@@ -89,6 +92,10 @@ const traces = computed(() => [{ ...datasetStore.filteredTimeSeries(), type: "sc
 
 function setYear(year: number) {
   yearSelected.value = year;
+}
+
+function onStepReady() {
+  timeSeriesPlotRef.value?.advanceAnimation();
 }
 
 async function updateTimeSeries(data: any) {

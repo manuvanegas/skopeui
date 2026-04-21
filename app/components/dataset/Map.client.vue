@@ -2,9 +2,11 @@
   <component
     :is="mapComponent"
     :year="year"
+    :step="year"
     :display-raster="displayRaster"
     :circle-to-polygon-edges="circleToPolygonEdges"
     @mapReady="emit('mapReady', $event)"
+    @stepReady="emit('stepReady')"
   />
 </template>
 
@@ -20,7 +22,7 @@ const props = defineProps({
   circleToPolygonEdges: { type: Number, default: 32 },
   mapEngine: { type: String, default: null },
 });
-const emit = defineEmits(["mapReady"]);
+const emit = defineEmits(["mapReady", "stepReady"]);
 
 const route = useRoute();
 const runtimeConfig = useRuntimeConfig();

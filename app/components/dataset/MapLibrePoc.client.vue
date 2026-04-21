@@ -106,7 +106,7 @@ const props = defineProps({
   displayRaster: { type: Boolean, default: true },
   circleToPolygonEdges: { type: Number, default: 32 },
 });
-const emit = defineEmits(["mapReady"]);
+const emit = defineEmits(["mapReady", "stepReady"]);
 
 const route = useRoute();
 const appStore = useAppStore();
@@ -186,8 +186,11 @@ let syncDrawQueue: Promise<void> = Promise.resolve();
 let isMapLoaded = false;
 let pendingStudyAreaGeoJson: any = null;
 
-const COG_SOURCE_ID = "cog-source";
-const COG_LAYER_ID = "cog-layer";
+const COG_A = { sourceId: "cog-source-a", layerId: "cog-layer-a" };
+const COG_B = { sourceId: "cog-source-b", layerId: "cog-layer-b" };
+let cogFront = COG_A;  // currently visible slot
+let cogBack  = COG_B;  // currently loading / empty slot
+let pendingIdleSwap: (() => void) | null = null;
 const FILL_LAYER_ID = "dataset-region-fill";
 const STUDY_AREA_SOURCE_ID = "study-area-display";
 const STUDY_AREA_FILL_LAYER_ID = "study-area-display-fill";
@@ -258,57 +261,86 @@ function getCogFullUrl(baseUrl, step) {
   return `${baseUrl}/${urlStep}/{z}/{x}/{y}?colormap=rain&rescale=${min},${max}`; // TODO: Add colormap flexibility
 }
 
-function addCogRasterLayer(step: number) {
-  if (!map || !isMapLoaded) return;
-  if (!cogBaseUrl.value) return;
-  const cogUrl = getCogFullUrl(cogBaseUrl.value, step);
-  if (map.getLayer(COG_LAYER_ID)) map.removeLayer(COG_LAYER_ID);
-  if (map.getSource(COG_SOURCE_ID)) map.removeSource(COG_SOURCE_ID);
-
+function getCogBounds(): number[] | undefined {
   const extents = metadata.value?.region?.extents;
   const nw = extents?.[0];
   const se = extents?.[1];
-  let bounds
   if (Array.isArray(nw) && Array.isArray(se)) {
     const [north, west] = nw;
     const [south, east] = se;
-    bounds = [west, south, east, north];
-  } else {
-    bounds = undefined;
+    return [west, south, east, north];
   }
+  return undefined;
+}
 
-  map.addSource(COG_SOURCE_ID, {
+function addCogSlot(slot: typeof COG_A, step: number, opacity: number) {
+  if (!map || !isMapLoaded || !cogBaseUrl.value) return;
+  const url = getCogFullUrl(cogBaseUrl.value, step);
+  const bounds = getCogBounds();
+  map.addSource(slot.sourceId, {
     type: "raster",
-    tiles: [cogUrl],
+    tiles: [url],
     tileSize: 128,
     ...(bounds && { bounds }),
-  })
-
-  map.addLayer({
-    id: COG_LAYER_ID,
-    type: "raster",
-    source: COG_SOURCE_ID,
-    paint: { "raster-opacity": 0.7 },
-  },
+  });
+  map.addLayer(
+    { id: slot.layerId, type: "raster", source: slot.sourceId,
+      paint: { "raster-opacity": opacity } },
     FILL_LAYER_ID,
   );
 }
 
+function removeCogSlot(slot: typeof COG_A) {
+  if (!map) return;
+  if (map.getLayer(slot.layerId))   map.removeLayer(slot.layerId);
+  if (map.getSource(slot.sourceId)) map.removeSource(slot.sourceId);
+}
+
+function cancelPendingSwap() {
+  if (pendingIdleSwap) {
+    map?.off("idle", pendingIdleSwap);
+    pendingIdleSwap = null;
+    removeCogSlot(cogBack);  // discard the back buffer that was loading
+  }
+}
+
+function addCogRasterLayer(step: number) {
+  if (!map || !isMapLoaded || !cogBaseUrl.value) return;
+  cancelPendingSwap();
+  removeCogSlot(cogFront);
+  removeCogSlot(cogBack);
+  cogFront = COG_A;
+  cogBack  = COG_B;
+  addCogSlot(cogFront, step, 0.7);
+}
+
 function removeCogRasterLayer() {
   if (!map || !isMapLoaded) return;
-  if (map.getLayer(COG_LAYER_ID)) map.removeLayer(COG_LAYER_ID);
-  if (map.getSource(COG_SOURCE_ID)) map.removeSource(COG_SOURCE_ID);
+  cancelPendingSwap();
+  removeCogSlot(cogFront);
+  removeCogSlot(cogBack);
 }
 
 function updateRasterLayer(step: number) {
-  if (!map || !isMapLoaded) return;
-  if (!cogBaseUrl.value) return;
-  if (map.getSource(COG_SOURCE_ID)) {
-    const cogSource = map.getSource(COG_SOURCE_ID) as maplibregl.RasterTileSource;
-    cogSource.setTiles([getCogFullUrl(cogBaseUrl.value, step)]);
-  } else {
+  if (!map || !isMapLoaded || !cogBaseUrl.value) return;
+  if (!map.getSource(cogFront.sourceId)) {
     addCogRasterLayer(step);
+    return;
   }
+
+  cancelPendingSwap();
+  addCogSlot(cogBack, step, 0);  // load invisibly
+
+  pendingIdleSwap = () => {
+    if (!map || !isMapLoaded) return;
+    if (!map.getSource(cogBack.sourceId)) return;  // guard: swap was cancelled
+    map.setPaintProperty(cogBack.layerId, "raster-opacity", 0.7);
+    removeCogSlot(cogFront);
+    [cogFront, cogBack] = [cogBack, cogFront];      // swap references
+    pendingIdleSwap = null;
+    emit("stepReady");
+  };
+  map.once("idle", pendingIdleSwap);
 }
 
 function mapExtentPolygon(extents: any): any {
@@ -682,6 +714,10 @@ watch(
 onUnmounted(() => {
   isMapLoaded = false;
   pendingStudyAreaGeoJson = null;
+  if (pendingIdleSwap && map) {
+    map.off("idle", pendingIdleSwap);
+    pendingIdleSwap = null;
+  }
   if (gm) {
     gm.destroy();
     gm = null;
