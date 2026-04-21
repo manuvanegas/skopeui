@@ -1,8 +1,7 @@
 <template>
   <component
     :is="mapComponent"
-    :year="year"
-    :step="year"
+    :step="step"
     :display-raster="displayRaster"
     :circle-to-polygon-edges="circleToPolygonEdges"
     @mapReady="emit('mapReady', $event)"
@@ -17,7 +16,7 @@ import LeafletMap from "@/components/dataset/LeafletMap.client.vue";
 import MapLibrePoc from "@/components/dataset/MapLibrePoc.client.vue";
 
 const props = defineProps({
-  year: { type: Number, default: 2000 },
+  step: { type: Number, default: 2000 },
   displayRaster: { type: Boolean, default: true },
   circleToPolygonEdges: { type: Number, default: 32 },
   mapEngine: { type: String, default: null },
@@ -27,7 +26,7 @@ const emit = defineEmits(["mapReady", "stepReady"]);
 const route = useRoute();
 const runtimeConfig = useRuntimeConfig();
 
-const year = computed(() => props.year);
+const step = computed(() => props.step);
 const displayRaster = computed(() => props.displayRaster);
 const circleToPolygonEdges = computed(() => props.circleToPolygonEdges);
 const mapEngine = computed(() => {

@@ -26,7 +26,7 @@
         sm="12"
         align-self="stretch"
       >
-        <Map ref="mapRef" :year="yearSelected" :display-raster="true" map-engine="maplibre" @step-ready="onStepReady" />
+        <Map ref="mapRef" :step="stepSelected" :display-raster="true" map-engine="maplibre" @step-ready="onStepReady" />
       </v-col>
       <!-- time series plot -->
       <v-col
@@ -41,8 +41,8 @@
           :show-area="true"
           :show-step-controls="true"
           :traces="traces"
-          :year-selected="yearSelected"
-          @year-selected="setYear"
+          :step-selected="stepSelected"
+          @step-selected="setStep"
         />
       </v-col>
     </v-row>
@@ -77,7 +77,7 @@ const analysisStore = useAnalysisStore();
 const messageStore = useMessagesStore();
 const legacyActions = useLegacyStoreActions();
 
-const yearSelected = ref(1500);
+const stepSelected = ref(1500);
 const mapRef = ref();
 const timeSeriesPlotRef = ref();
 let stopTimeSeriesWatch: (() => void) | null = null;
@@ -90,8 +90,8 @@ const analyzeLocation = computed(() => ({
 const isLoadingMetadata = computed(() => datasetStore.metadata == null);
 const traces = computed(() => [{ ...datasetStore.filteredTimeSeries(), type: "scatter" }]);
 
-function setYear(year: number) {
-  yearSelected.value = year;
+function setStep(step: number) {
+  stepSelected.value = step;
 }
 
 function onStepReady() {
@@ -155,7 +155,7 @@ await useAsyncData(
       route.params.id as string,
       route.params.variable as string
     );
-    yearSelected.value = datasetStore.temporalRangeMin;
+    stepSelected.value = datasetStore.temporalRangeMin;
     return true;
   },
   { server: false }
