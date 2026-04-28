@@ -79,7 +79,7 @@
     <v-card-text class="map">
       <div ref="mapContainer" class="maplibre-map"></div>
       <div v-if="isStepLoading" class="map-step-loading">
-        <v-progress-circular indeterminate color="primary" size="28" width="3" />
+        <v-progress-circular indeterminate color="primary" size="48" width="4" />
       </div>
     </v-card-text>
   </v-card>
@@ -796,6 +796,7 @@ onUnmounted(() => {
   height: calc(95% - 48px);
   position: relative;
   z-index: 1;
+  overflow: visible;
 }
 
 .maplibre-map {

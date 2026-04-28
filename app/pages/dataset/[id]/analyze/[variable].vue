@@ -313,9 +313,16 @@ async function retrieveAnalysis(data: any) {
       const detail = Array.isArray(responseData.detail)
       ? responseData.detail
       : [{ msg: responseData.detail }];
-      if (status === 504) datasetStore.setTimeSeriesTimeout();
-      else if (status >= 500) datasetStore.setTimeSeriesServerError(detail);
-      else if (status >= 400) datasetStore.setTimeSeriesBadRequest(detail);
+      if (status === 504) {
+        datasetStore.setTimeSeriesTimeout();
+        messageStore.error("Request timed out. Try a smaller area or shorter date range.");
+      } else if (status >= 500) {
+        datasetStore.setTimeSeriesServerError(detail);
+        messageStore.error(detail.map((d: any) => d.msg).join(" ") || "Server error. Please try again.");
+      } else if (status >= 400) {
+        datasetStore.setTimeSeriesBadRequest(detail);
+        messageStore.error(detail.map((d: any) => d.msg).join(" ") || "Bad request.");
+      }
     } else {
       messageStore.error(e.message || "An unknown error occurred while retrieving analysis results. Please go back to the Select Area and try again.");
     }

@@ -126,10 +126,19 @@
       </div>
 
       <div class="time-series-plot-shell">
+        <div v-if="timeSeriesRequestStatus.status === 'loading'" class="timeseries-loading-overlay">
+          <v-progress-circular indeterminate color="primary" size="52" width="4" />
+          <p class="loading-message mt-4">{{ loadingMessage }}</p>
+        </div>
         <client-only placeholder="Loading...">
-          <template v-if="timeSeriesRequestStatus.status !== 'success'">
+          <template
+            v-if="timeSeriesRequestStatus.status !== 'success'
+              && timeSeriesRequestStatus.status !== 'loading'"
+          >
             <v-alert
-              v-for="(message, index) in timeSeriesRequestStatus.messages"
+              v-for="(message, index) in timeSeriesRequestStatus.messages.filter(
+                (m) => m.type !== 'error'
+              )"
               :key="index"
               :type="message.type"
               class="mb-2"
@@ -152,7 +161,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, defineAsyncComponent } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from "vue";
 import _ from "lodash";
 import { useRoute } from "vue-router";
 import { useDatasetStore } from "@/stores/dataset";
@@ -184,6 +193,28 @@ const localTemporalRangeMax = ref(new Date().getFullYear());
 const isTemporalRangeEditable = ref(false);
 const isTemporalRangeValid = ref(false);
 const plotlyRef = ref<any>(null);
+
+const PROGRESSIVE_MESSAGES = [
+  { delay: 8_000, text: "Still working..." },
+  { delay: 16_000, text: "Hang tight, almost there..." },
+  { delay: 24_000, text: "This is taking longer than usual, but we'll get there..." },
+];
+
+const loadingMessage = ref("");
+let progressiveTimers: ReturnType<typeof setTimeout>[] = [];
+
+function startProgressiveMessages() {
+  clearProgressiveMessages();
+  progressiveTimers = PROGRESSIVE_MESSAGES.map(({ delay, text }) =>
+    setTimeout(() => { loadingMessage.value = text; }, delay)
+  );
+}
+
+function clearProgressiveMessages() {
+  progressiveTimers.forEach(clearTimeout);
+  progressiveTimers = [];
+  loadingMessage.value = "";
+}
 
 // Computed
 const selectedTemporalRange = computed({
@@ -385,6 +416,16 @@ async function getTimeSeriesPlotImage() {
   return { png, svg };
 }
 
+watch(
+  () => timeSeriesRequestStatus.value.status,
+  (status) => {
+    if (status === "loading") startProgressiveMessages();
+    else clearProgressiveMessages();
+  }
+);
+
+onUnmounted(() => { clearProgressiveMessages(); });
+
 defineExpose({ getTimeSeriesPlotImage, advanceAnimation });
 
 onMounted(() => {
@@ -483,10 +524,28 @@ watch(layoutMetadata, (layout) => {
 }
 
 .time-series-plot-shell {
+  position: relative;
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
   min-height: 0;
+}
+
+.timeseries-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.80);
+  pointer-events: none;
+}
+
+.loading-message {
+  font-size: 13px;
+  color: #596d7b;
 }
 
 .time-series {
