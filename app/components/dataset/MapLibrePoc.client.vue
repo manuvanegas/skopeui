@@ -135,15 +135,10 @@ const initialMapCenter = computed(() => initialMapViewport.value.center);
 
 const cogBaseUrl = computed(getCogBaseUrl);
 const legendVisible = computed(() => props.displayRaster && !!cogBaseUrl.value);
-const variableUnit = computed(
-  () => (datasetStore.variable as any)?.units ?? (datasetStore.variable as any)?.unit ?? null
-);
+const variableUnit = computed(() => datasetStore.variable?.units ?? null);
 // Raw numeric values (used for midpoint arithmetic)
-const minVal = computed(() => (datasetStore.variable as any)?.min ?? 0);
-const maxVal = computed(() => {
-  const max = (datasetStore.variable as any)?.max;
-  return max != null ? max : 100;
-});
+const minVal = computed(() => datasetStore.variable?.min ?? 0);
+const maxVal = computed(() => datasetStore.variable?.max ?? 100);
 type MapLibreBaseLayer = {
   id: string;
   name: string;
@@ -693,6 +688,7 @@ onMounted(() => {
         vmin: minVal.value,
         vmax: maxVal.value * COLOR_MAX_PCT,
         units: variableUnit.value ?? undefined,
+        vmaxPct: COLOR_MAX_PCT,
       });
       map.addControl(colorbar, "bottom-left");
     }

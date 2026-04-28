@@ -6,6 +6,7 @@ export class SkopeColorbar implements maplibregl.IControl {
   private _vmax: number;
   private _units: string | undefined;
   private readonly _colors: string[];
+  private readonly _vmaxPct: number | undefined;
 
   private static _idCounter = 0;
   private readonly _gradientId: string;
@@ -15,11 +16,12 @@ export class SkopeColorbar implements maplibregl.IControl {
   private static readonly PAD = 6;
   private static readonly TICKS = 5;
 
-  constructor(opts: { colors: string[]; vmin: number; vmax: number; units?: string }) {
+  constructor(opts: { colors: string[]; vmin: number; vmax: number; units?: string; vmaxPct?: number }) {
     this._colors = opts.colors;
     this._vmin = opts.vmin;
     this._vmax = opts.vmax;
     this._units = opts.units;
+    this._vmaxPct = opts.vmaxPct;
     this._gradientId = `skope-cmap-${SkopeColorbar._idCounter++}`;
   }
 
@@ -71,17 +73,21 @@ export class SkopeColorbar implements maplibregl.IControl {
     const tickLines = Array.from({ length: TICKS }, (_, i) => {
       const v = this._vmax - (i / (TICKS - 1)) * range;
       const y = (PAD + 0.5) + ((BAR_H - 1) * (this._vmax - v)) / range;
-      const valueText = v.toFixed(1);
+      const annotation = (i === 0 && this._vmaxPct !== undefined)
+        ? `<text x="${labelX}" y="${(y + 11).toFixed(1)}" dominant-baseline="middle"
+                font-size="8" font-family="sans-serif" fill="#888" font-style="italic">(${Math.round(this._vmaxPct * 100)}% of max)</text>`
+        : "";
       return `
         <line x1="${tickX}" y1="${y.toFixed(1)}" x2="${tickX + 4}" y2="${y.toFixed(1)}"
               stroke="#666" stroke-width="1"/>
         <text x="${labelX}" y="${y.toFixed(1)}" dominant-baseline="middle"
-              font-size="10" font-family="sans-serif" fill="#333">${valueText}</text>`;
+              font-size="10" font-family="sans-serif" fill="#333">${v.toFixed(1)}</text>
+        ${annotation}`;
     }).join("");
 
     this._container.innerHTML = `
       ${this._units ? `<div class="skope-colorbar__units">Units: ${this._units}</div>` : ""}
-      <svg width="${svgW}" height="${svgH}" xmlns="http://www.w3.org/2000/svg">
+      <svg width="${svgW}" height="${svgH}" overflow="visible" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id="${this._gradientId}" x1="0" y1="0" x2="0" y2="1">
             ${stops}

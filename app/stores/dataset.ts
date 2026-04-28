@@ -44,6 +44,14 @@ function selectedAreaInSquareKmFromGeoJson(geoJson: unknown): string {
 
 type DatasetVariable = {
   id: string | null;
+  name?: string;
+  class?: string;
+  units?: string;
+  description?: string;
+  styles?: string;
+  min?: number;
+  max?: number;
+  visible?: boolean;
   colormap?: string;
   colormap_stops?: string[];
 } & Record<string, unknown>;
@@ -86,7 +94,7 @@ export const useDatasetStore = defineStore("dataset", {
     },
     defaultApiRequestData: (state) => {
       const metadata = state.metadata as any;
-      const variable = state.variable as any;
+      const variable = state.variable;
       const [minYear, maxYear] = state.temporalRange;
       return {
         dataset_id: metadata?.id,
