@@ -42,7 +42,11 @@ function selectedAreaInSquareKmFromGeoJson(geoJson: unknown): string {
   }
 }
 
-type DatasetVariable = { id: string | null } & Record<string, unknown>;
+type DatasetVariable = {
+  id: string | null;
+  colormap?: string;
+  colormap_stops?: string[];
+} & Record<string, unknown>;
 
 export const useDatasetStore = defineStore("dataset", {
   state: () => ({
