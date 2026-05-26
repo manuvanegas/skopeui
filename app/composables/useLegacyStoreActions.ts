@@ -146,13 +146,14 @@ export function useLegacyStoreActions() {
       const error = new Error(`Request failed with status ${result.status}`) as Error & {
         response?: { status: number; data: unknown };
       };
+      const failMsg: string = result.error ?? result.detail ?? "Analysis job failed";
       error.response = {
         status: 500,
-        data: result,
+        data: { detail: [{ msg: failMsg }] },
       };
       throw error;
     }
-    // imlpicit else: deadline exceeded
+    // implicit else: deadline exceeded
     const error = new Error("Request timed out") as Error & {
       response?: { status: number; data: unknown };
     };
@@ -191,7 +192,7 @@ export function useLegacyStoreActions() {
     // if no existing job or error status is 404 or 422 (job if not found or invalid), submit a new request
     const newJobId = await submitTimeSeriesRequest(requestData);
     const response = await pollTimeSeriesStatus(newJobId);
-    const result = response.result
+    const result = response.result;
     return {newJobId, response: result};
   }
 

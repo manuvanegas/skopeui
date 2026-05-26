@@ -85,7 +85,6 @@ export function createAnalysisStore(overrides: Record<string, unknown> = {}) {
     requestData: null as unknown,
     response: null as unknown,
     responseError: null as unknown,
-    waitingForResponse: false,
     summaryStatistics: [] as unknown[],
     timeseries: [] as unknown[],
     setGeoJson: vi.fn(),
@@ -107,9 +106,6 @@ export function createAnalysisStore(overrides: Record<string, unknown> = {}) {
     }),
     setResponseError: vi.fn((value: unknown) => {
       (store as any).responseError = value;
-    }),
-    setWaitingForResponse: vi.fn((value: boolean) => {
-      (store as any).waitingForResponse = value;
     }),
   });
 

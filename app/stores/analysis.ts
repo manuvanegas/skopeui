@@ -15,7 +15,6 @@ export const useAnalysisStore = defineStore("analysis", {
   state: () => ({
     summaryStatistics: [] as any[],
     response: { ...EMPTY_RESPONSE } as any,
-    waitingForResponse: false,
     timeseries: [] as any[],
     requestData: {} as Record<string, unknown>,
     responseError: {} as Record<string, unknown>,
@@ -42,9 +41,6 @@ export const useAnalysisStore = defineStore("analysis", {
       this.response = response;
       this.timeseries = this.derivedTimeseries;
       this.summaryStatistics = this.derivedSummaryStatistics;
-    },
-    setWaitingForResponse(value: boolean) {
-      this.waitingForResponse = value;
     },
     setRequestData(requestData: Record<string, unknown>) {
       this.requestData = requestData;

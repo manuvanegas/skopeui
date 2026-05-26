@@ -116,7 +116,7 @@ import { useAppStore } from "@/stores/app";
 import { useDatasetStore } from "@/stores/dataset";
 
 const props = defineProps({
-  year: { type: Number, default: 2000 },
+  step: { type: Number, default: 2000 },
   displayRaster: { type: Boolean, default: true },
   circleToPolygonEdges: { type: Number, default: 32 },
 });

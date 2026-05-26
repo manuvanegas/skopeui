@@ -110,7 +110,7 @@ describe("route /dataset/:id/visualize/:variable", () => {
 
     expect(page.findComponent({ name: "MapStub" }).exists()).toBe(true);
     expect(map.attributes("data-map-engine")).toBe("maplibre");
-    expect(map.attributes("data-display-raster")).toBe("false");
+    expect(map.attributes("data-display-raster")).toBe("true");
     expect(page.findComponent({ name: "TimeSeriesPlotStub" }).exists()).toBe(true);
   });
 

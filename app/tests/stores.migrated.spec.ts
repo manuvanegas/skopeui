@@ -223,9 +223,6 @@ describe("migrated pinia stores", () => {
     store.setResponse({ ok: true });
     expect(store.response).toEqual({ ok: true });
 
-    store.setWaitingForResponse(true);
-    expect(store.waitingForResponse).toBe(true);
-
     store.setGeoJson({ type: "FeatureCollection", features: [] });
     expect((store.requestData as any).selected_area).toEqual({
       type: "FeatureCollection",

@@ -1,5 +1,14 @@
 import type maplibregl from "maplibre-gl";
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export class SkopeColorbar implements maplibregl.IControl {
   private _container: HTMLDivElement | null = null;
   private _vmin: number;
@@ -60,12 +69,13 @@ export class SkopeColorbar implements maplibregl.IControl {
     const labelX = BAR_W + 6;
     const svgW = BAR_W + 52;
 
+    const n = this._colors.length;
     const stops = this._colors
       .slice()
       .reverse()
       .map((c, i) => {
-        const offset = ((i / (this._colors.length - 1)) * 100).toFixed(1);
-        return `<stop offset="${offset}%" stop-color="${c}"/>`;
+        const offset = n <= 1 ? "0.0" : ((i / (n - 1)) * 100).toFixed(1);
+        return `<stop offset="${offset}%" stop-color="${escapeHtml(c)}"/>`;
       })
       .join("");
 
@@ -86,7 +96,7 @@ export class SkopeColorbar implements maplibregl.IControl {
     }).join("");
 
     this._container.innerHTML = `
-      ${this._units ? `<div class="skope-colorbar__units">Units: ${this._units}</div>` : ""}
+      ${this._units ? `<div class="skope-colorbar__units">Units: ${escapeHtml(this._units)}</div>` : ""}
       <svg width="${svgW}" height="${svgH}" overflow="visible" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id="${this._gradientId}" x1="0" y1="0" x2="0" y2="1">

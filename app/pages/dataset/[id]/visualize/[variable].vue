@@ -26,7 +26,7 @@
         sm="12"
         align-self="stretch"
       >
-        <Map ref="mapRef" :step="stepSelected" :display-raster="true" map-engine="maplibre" @step-ready="onStepReady" />
+        <Map :step="stepSelected" :display-raster="true" map-engine="maplibre" @step-ready="onStepReady" />
       </v-col>
       <!-- time series plot -->
       <v-col
@@ -61,7 +61,6 @@ import _ from "lodash";
 import { extractYear } from "@/store/stats";
 import { useAppStore } from "@/stores/app";
 import { useDatasetStore } from "@/stores/dataset";
-import { useAnalysisStore } from "@/stores/analysis";
 import { useMessagesStore } from "@/stores/messages";
 import { useLegacyStoreActions } from "@/composables/useLegacyStoreActions";
 
@@ -73,12 +72,10 @@ definePageMeta({
 const route = useRoute();
 const appStore = useAppStore();
 const datasetStore = useDatasetStore();
-const analysisStore = useAnalysisStore();
 const messageStore = useMessagesStore();
 const legacyActions = useLegacyStoreActions();
 
 const stepSelected = ref(1500);
-const mapRef = ref();
 const timeSeriesPlotRef = ref();
 let stopTimeSeriesWatch: (() => void) | null = null;
 
@@ -106,9 +103,7 @@ async function updateTimeSeries(data: any) {
   datasetStore.setTimeSeriesLoading();
   try {
     const varId = route.params.variable as string;
-    console.log("Requesting time series with varId:", varId);
     const jobId = datasetStore.jobIds?.[varId];
-    // console.log("Requesting time series with data:", data, "and jobId:", jobId);
     const {newJobId, response} = await legacyActions.resolveTimeSeries(jobId, data);
     datasetStore.setJobId(varId, newJobId);
     const originalSeries = response.series[0];
@@ -144,7 +139,9 @@ async function updateTimeSeries(data: any) {
         messageStore.error(detail.map((d: any) => d.msg).join(" ") || "Bad request.");
       }
     } else {
-      messageStore.error(e.message || "An unknown error occurred while retrieving analysis results. Please go back to the Select Area and try again.");
+      const msg = e.message || "An unknown error occurred while retrieving analysis results. Please go back to the Select Area and try again.";
+      datasetStore.setTimeSeriesServerError([{ msg }]);
+      messageStore.error(msg);
     }
   }
 }

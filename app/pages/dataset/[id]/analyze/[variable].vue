@@ -307,6 +307,7 @@ async function retrieveAnalysis(data: any) {
     const {newJobId, response} = await legacyActions.resolveTimeSeries(jobId, data);
     datasetStore.setJobId(varId, newJobId);
     analysisStore.setResponse(response);
+    datasetStore.setTimeSeriesLoaded();
   } catch (e: any) {
     if (e.response) {
       const { status, data: responseData } = e.response;
@@ -324,10 +325,10 @@ async function retrieveAnalysis(data: any) {
         messageStore.error(detail.map((d: any) => d.msg).join(" ") || "Bad request.");
       }
     } else {
-      messageStore.error(e.message || "An unknown error occurred while retrieving analysis results. Please go back to the Select Area and try again.");
+      const msg = e.message || "An unknown error occurred while retrieving analysis results. Please go back to the Select Area and try again.";
+      datasetStore.setTimeSeriesServerError([{ msg }]);
+      messageStore.error(msg);
     }
-  } finally {
-    datasetStore.setTimeSeriesLoaded();
   }
 }
 
@@ -401,7 +402,7 @@ async function exportData() {
 }
 
 async function updateTimeSeries() {
-  if (!analysisFormValid.value || analysisStore.waitingForResponse) return;
+  if (!analysisFormValid.value || datasetStore.timeSeriesRequestStatus.status === "loading") return;
   const requestData = {
     ...datasetStore.defaultApiRequestData,
     zonal_statistic: zonalStatistic.value,

@@ -105,7 +105,7 @@ import { getInitialMapViewport } from "@/composables/useMapInitialViewport";
 import { useAppStore } from "@/stores/app";
 import { useDatasetStore } from "@/stores/dataset";
 
-const COLOR_MAX_PCT = 0.85;
+const COLOR_MAX_PCT = 0.5;
 
 let colorbar: SkopeColorbar | null = null;
 
@@ -272,7 +272,7 @@ function getCogFullUrl(baseUrl, step) {
     console.warn(`Variable ${datasetStore.variable?.id} is missing min/max — falling back to rescale 0,100`)
   } 
   const min = datasetStore.variable?.min ?? 0;
-  const max = datasetStore.variable?.max * COLOR_MAX_PCT ?? 100;
+  const max = (datasetStore.variable?.max ?? 100) * COLOR_MAX_PCT;
   const urlStep = step.toString().padStart(4, "0"); // TODO: Add flexibility for different time resolutions
   return `${baseUrl}/${urlStep}/{z}/{x}/{y}?colormap=${datasetStore.variable.colormap}&rescale=${min},${max}`;
 }
@@ -683,14 +683,22 @@ onMounted(() => {
     }
 
     if (props.displayRaster) {
-      colorbar = new SkopeColorbar({
-        colors: datasetStore.variable.colormap_stops ?? [],
-        vmin: minVal.value,
-        vmax: maxVal.value * COLOR_MAX_PCT,
-        units: variableUnit.value ?? undefined,
-        vmaxPct: COLOR_MAX_PCT,
-      });
-      map.addControl(colorbar, "bottom-left");
+      const colormapStops = datasetStore.variable.colormap_stops;
+      if (!Array.isArray(colormapStops) || colormapStops.length < 2) {
+        console.error(
+          `Variable '${datasetStore.variable.id}' has invalid colormap_stops (got ${JSON.stringify(colormapStops)}). Colorbar will not be shown.`
+        );
+        messageStore.error("Colormap data is missing or invalid for this variable. The legend cannot be displayed.");
+      } else {
+        colorbar = new SkopeColorbar({
+          colors: colormapStops,
+          vmin: minVal.value,
+          vmax: maxVal.value * COLOR_MAX_PCT,
+          units: variableUnit.value ?? undefined,
+          vmaxPct: COLOR_MAX_PCT,
+        });
+        map.addControl(colorbar, "bottom-left");
+      }
     }
 
     emit("mapReady", true);
@@ -736,7 +744,7 @@ watch(
   (step: number) => {
     updateRasterLayer(step);
   }
-)
+);
 
 watch([minVal, maxVal, variableUnit], () => {
   colorbar?.update({
@@ -758,7 +766,7 @@ watch(
       addCogRasterLayer(props.step);
     }
   }
-)
+);
 
 onUnmounted(() => {
   isMapLoaded = false;
