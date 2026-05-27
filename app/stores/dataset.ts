@@ -88,6 +88,14 @@ export const useDatasetStore = defineStore("dataset", {
     jobIds: {} as Record<string, string>,
   }),
   getters: {
+    timeseriesTrace: (state) => {
+      if (!state.hasData) return null;
+      return {
+        x: state.timeSeries.x,
+        y: state.timeSeries.y,
+        name: state.timeSeries.options?.name || "Original",
+      };
+    },
     geoJsonKey: (state) => {
       const metadataId = (state.metadata as any)?.id;
       return metadataId ? `geojson:${metadataId}` : "skope:geometry";

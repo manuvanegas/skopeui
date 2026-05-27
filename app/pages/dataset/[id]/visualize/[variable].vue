@@ -85,7 +85,11 @@ const analyzeLocation = computed(() => ({
   params: { id: route.params.id, variable: route.params.variable },
 }));
 const isLoadingMetadata = computed(() => datasetStore.metadata == null);
-const traces = computed(() => [{ ...datasetStore.filteredTimeSeries(), type: "scatter" }]);
+const traces = computed(() => {
+  const ts = datasetStore.timeseriesTrace;
+  if (!ts) return [];
+  return [{ ...ts, type: "scatter" }];
+});
 
 function setStep(step: number) {
   stepSelected.value = step;
