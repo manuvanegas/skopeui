@@ -11,3 +11,4 @@ docker-compose.yml
 secrets
 _citation.bib
 _citation.txt
+app/contracts

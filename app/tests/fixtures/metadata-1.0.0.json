@@ -1,0 +1,131 @@
+{
+  "schema_version": "1.0.0",
+  "datasets": [
+    {
+      "id": "paleocar_v3",
+      "title": "PaleoCAR: SW USA Paleoclimate Reconstruction (V3)",
+      "description": "High spatial resolution (30 arc-second, ~800 m) tree-ring reconstructions of growing degree days and precipitation for the Southwestern United States, 103–2000 CE, made with the PaleoCAR method (Bocinsky and Kohler 2014).",
+      "version": "3",
+      "license": "CC-BY-4.0",
+      "profile": "TemporalCubeDataset",
+      "region_name": "Southwestern USA",
+      "bbox": [
+        -114.995833333457, 30.99583333406604, -101.995833334055,
+        42.9958333336016
+      ],
+      "resolution_label": "30 arc-second (~830 m)",
+      "time": {
+        "kind": "regular",
+        "precision": "year",
+        "count": 1898,
+        "origin": "0103",
+        "end": "2000",
+        "step": "P1Y",
+        "values": null
+      },
+      "providers": [
+        {
+          "name": "R. Kyle Bocinsky and Timothy A. Kohler",
+          "roles": ["producer", "licensor"],
+          "url": null
+        },
+        {
+          "name": "SKOPE project",
+          "roles": ["processor", "host"],
+          "url": null
+        }
+      ],
+      "citation": null,
+      "doi": null,
+      "publications": [
+        {
+          "citation": "Bocinsky, R. Kyle, and Timothy A. Kohler. 2014. A 2,000-year reconstruction of the rain-fed maize agricultural niche in the US Southwest. Nature Communications 5:5618.",
+          "doi": "10.1038/ncomms6618"
+        },
+        {
+          "citation": "Bocinsky, R. Kyle, Johnathan Rush, Keith W. Kintigh, and Timothy A. Kohler. 2016. Exploration and exploitation in the macrohistory of the pre-Hispanic Pueblo Southwest. Science Advances 2(4):e1501532.",
+          "doi": "10.1126/sciadv.1501532"
+        }
+      ],
+      "lineage": "In addition to reconstructions of calendar-year and growing-season precipitation, PaleoCAR v3 differs from v2 in two ways. It uses the detrended and indexed (standardized) series ('ARSTND') available from the ITRDB instead of the 'Standard' chronologies, which left four or fewer chronologies available for 1–102 CE and 418–589 CE. It selects models by minimizing the corrected Akaike information criterion in a stepwise fashion, instead of the predicted residual error sum of squares (PRESS) statistic. For each pixel and year, the model selects the tree-ring chronologies (within a 10-degree buffer of the Four Corners states, from the National Tree Ring Database) that best predict PRISM data for that location, and uses linear regression to estimate the paleoenvironmental variable for that date and location.",
+      "uncertainty": {
+        "summary": "There are two primary sources of uncertainty in PaleoCAR reconstructions. The first is that the PaleoCAR algorithm attempts to select the most relevant three ring chronologies for reconstructing a particular variable of interest at a particular time. This selection process, minimizing the corrected Akaike information criterion in a stepwise fashion, can lead to different sets of chronologies being selected for adjacent pixels in a gridded reconstruction. Discrepancies between selected chronologies can manifest as spatiotemporal \"artifacts\", or discontinuities (Bocinsky and Kohler 2014:8). These are amplified by the chained mean-variance matching technique (Bocinsky et al. 2016:10). Additional uncertainty is associated with the lack of fit in the regression models; fit decreases as fewer tree ring chronologies are available.",
+        "methodology_href": null
+      },
+      "links": [
+        {
+          "rel": "via",
+          "href": "https://www.ncei.noaa.gov/access/paleo-search/study/19783",
+          "title": "NOAA NCEI paleoclimatology study 19783"
+        }
+      ],
+      "order": 10,
+      "map_view": {
+        "center": {
+          "lon": -108.5,
+          "lat": 37.0
+        },
+        "zoom": 4
+      },
+      "default_variable": "ppt_annual",
+      "release_id": "paleocar_v3-r-2026.10.07",
+      "declaration_digest": "fa5b29a944289e7677f1bff46216a2222f20f5eb73d7237e9d453e0c2e1f059e",
+      "variables": [
+        {
+          "id": "ppt_annual",
+          "title": "Annual (Jan–Dec) Precipitation",
+          "description": "Calendar-year (January–December) total precipitation, reconstructed by PaleoCAR (the prediction_scaled product).",
+          "unit": "mm",
+          "category": "Precipitation",
+          "categories": null,
+          "labels": null,
+          "order": 10,
+          "display": {
+            "type": "continuous",
+            "palette": "skope-precip",
+            "colors": [
+              "#B5834A",
+              "#CDAA78",
+              "#DEC499",
+              "#EFE0CA",
+              "#D8EEEA",
+              "#9ECEC6",
+              "#5CAFA8",
+              "#358C87"
+            ],
+            "range": [0.0, 1807.5],
+            "ticks": 5,
+            "note": "Provisional: half the legacy registry's maximum for the prediction_scaled product (3615 mm), carried over from the UI's COLOR_MAX_PCT of 0.5."
+          }
+        },
+        {
+          "id": "gdd_cotton_annual",
+          "title": "Annual (Jan–Dec) Cotton Growing Degree Days",
+          "description": "Calendar-year (January–December) growing degree days for cotton, reconstructed by PaleoCAR (the prediction_scaled product).",
+          "unit": "°F GDD",
+          "category": "Growing Degree Days",
+          "categories": null,
+          "labels": null,
+          "order": 20,
+          "display": {
+            "type": "continuous",
+            "palette": "skope-precip",
+            "colors": [
+              "#B5834A",
+              "#CDAA78",
+              "#DEC499",
+              "#EFE0CA",
+              "#D8EEEA",
+              "#9ECEC6",
+              "#5CAFA8",
+              "#358C87"
+            ],
+            "range": [0.0, 2177.5],
+            "ticks": 5,
+            "note": "Provisional: half the legacy registry's maximum for the prediction_scaled product (4355 °F GDD), carried over from the UI's COLOR_MAX_PCT of 0.5."
+          }
+        }
+      ]
+    }
+  ]
+}
