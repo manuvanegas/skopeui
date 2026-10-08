@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, h, nextTick } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { createGeomanInstance } from "@geoman-io/maplibre-geoman-free";
 import MapLibre from "@/components/dataset/MapLibre.client.vue";
 import metadataFixture from "@/tests/fixtures/metadata-1.0.0.json";
 import { SkopeColorbar } from "@/utils/SkopeColorbar";
@@ -69,7 +70,7 @@ const mocks = vi.hoisted(() => {
     style: MockStyle;
     eventHandlers: Record<string, Function[]> = {};
 
-    addControl = vi.fn();
+    addControl = vi.fn((control: any) => control?.onAdd?.(this));
     fitBounds = vi.fn();
     remove = vi.fn();
     setLayoutProperty = vi.fn((id: string, property: string, value: string) => {
@@ -213,29 +214,12 @@ const VTooltipStub = defineComponent({
   template: '<div><slot name="activator" :props="{}" /><slot /></div>',
 });
 
-const VSelectStub = defineComponent({
-  name: "VSelectStub",
-  props: {
-    modelValue: { type: String, default: "" },
-    items: { type: Array, default: () => [] },
-  },
-  emits: ["update:modelValue"],
+const VListItemStub = defineComponent({
+  name: "VListItemStub",
+  props: { title: { type: String, default: "" } },
+  emits: ["click"],
   setup(props, { emit }) {
-    return () =>
-      h(
-        "select",
-        {
-          "data-test": "basemap-select",
-          value: props.modelValue,
-          onChange: (event: Event) => {
-            const target = event.target as HTMLSelectElement | null;
-            emit("update:modelValue", target?.value ?? "");
-          },
-        },
-        (props.items as any[]).map((item: any) =>
-          h("option", { key: item.value, value: item.value }, item.title),
-        ),
-      );
+    return () => h("div", { onClick: () => emit("click") }, props.title);
   },
 });
 
@@ -244,13 +228,15 @@ const uiStubs = {
   "v-toolbar": { template: "<div><slot /></div>" },
   "v-row": { template: "<div><slot /></div>" },
   "v-spacer": { template: "<div />" },
-  "v-alert": { template: "<div><slot /></div>" },
   "v-text-field": { template: "<input />" },
   "v-btn": { template: "<button><slot /></button>" },
   "v-icon": { template: "<i><slot /></i>" },
   "v-card-text": { template: "<div><slot /></div>" },
   "v-tooltip": VTooltipStub,
-  "v-select": VSelectStub,
+  "v-menu": VTooltipStub,
+  "v-list": { template: "<div><slot /></div>" },
+  "v-list-subheader": { template: "<div><slot /></div>" },
+  "v-list-item": VListItemStub,
 };
 
 describe("MapLibre basemap selector", () => {
@@ -313,13 +299,17 @@ describe("MapLibre basemap selector", () => {
     await flushPromises();
     await nextTick();
 
-    await wrapper
-      .find('[data-test="basemap-select"]')
-      .setValue("cartodb-positron");
+    const map = mocks.mapInstances[0];
+    // The basemap menu is teleported into its own MapLibre control.
+    const control = map.addControl.mock.results
+      .map((result: any) => result.value)
+      .find((el: any) => el?.querySelector?.('[data-test="basemap-button"]'));
+    const carto = [
+      ...control.querySelectorAll('[data-test="basemap-option"]'),
+    ].find((el: any) => el.textContent === "CartoDB.Positron");
+    carto.click();
     await flushPromises();
     await nextTick();
-
-    const map = mocks.mapInstances[0];
 
     expect(map.setLayoutProperty).toHaveBeenCalledWith(
       "basemap-layer-cartodb-positron",
@@ -332,11 +322,12 @@ describe("MapLibre basemap selector", () => {
       "none",
     );
 
-    const topo = map.getLayer("basemap-layer-esri-worldtopomap");
-    const carto = map.getLayer("basemap-layer-cartodb-positron");
-
-    expect(carto.layout?.visibility).toBe("visible");
-    expect(topo.layout?.visibility).toBe("none");
+    expect(
+      map.getLayer("basemap-layer-cartodb-positron").layout?.visibility,
+    ).toBe("visible");
+    expect(
+      map.getLayer("basemap-layer-esri-worldtopomap").layout?.visibility,
+    ).toBe("none");
   });
 
   it("[behavior] keeps visualize mode read-only and renders selected area overlay", async () => {
@@ -509,6 +500,118 @@ describe("MapLibre basemap selector", () => {
     const point = map.getLayer("study-area-display-point");
     expect(point.type).toBe("circle");
     expect(point.filter).toEqual(["==", ["geometry-type"], "Point"]);
+    expect(map.fitBounds).toHaveBeenCalledWith(
+      [
+        [-108.5, 37],
+        [-108.5, 37],
+      ],
+      expect.objectContaining({ maxZoom: 10 }),
+    );
+  });
+
+  it("[behavior] offers only the four study-area drawing tools", async () => {
+    mount(MapLibre, { global: { stubs: uiStubs } });
+    await flushPromises();
+
+    const [, options] = vi.mocked(createGeomanInstance).mock.calls[0];
+    const { draw, edit, helper } = (options as any).controls;
+    expect(
+      Object.keys(draw).filter((mode) => draw[mode].uiEnabled === false),
+    ).toEqual(["circle_marker", "text_marker", "ellipse", "line"]);
+    expect(draw.marker.title).toBe("Point: Click the map to place the point.");
+    expect(edit.cut).toEqual({ uiEnabled: false });
+    expect(edit.delete.title).toBe("Delete: Click the shape to remove it.");
+    expect(edit.change.title).toBe(
+      "Change: Drag a corner to change the shape.",
+    );
+    expect(helper.snapping).toEqual({ uiEnabled: false, active: true });
+    expect(helper.zoom_to_features.title).toBe("Zoom to shape");
+  });
+
+  it("[behavior] explains the active drawing tool next to the pointer", async () => {
+    const wrapper = mount(MapLibre, { global: { stubs: uiStubs } });
+    await flushPromises();
+    const handlers = mocks.mapInstances[0].eventHandlers;
+    const cursorHint = () => wrapper.find('[data-test="draw-cursor-hint"]');
+    const callout = () => wrapper.find('[data-test="draw-callout"]');
+    expect(callout().text()).toMatch(/Choose a shape/);
+    const [moved] = handlers.mousemove;
+    moved({ point: { x: 120, y: 80 } });
+    await nextTick();
+    expect(cursorHint().exists()).toBe(false);
+
+    const [toggled] = handlers["gm:globaldrawmodetoggled"];
+    toggled({ enabled: true, shape: "circle" });
+    await nextTick();
+    expect(cursorHint().text()).toBe(
+      "Click the center, then click again to set the radius.",
+    );
+    expect(cursorHint().attributes("style")).toContain("left: 120px");
+    expect(callout().exists()).toBe(false);
+
+    const [left] = handlers.mouseout;
+    left();
+    await nextTick();
+    expect(cursorHint().exists()).toBe(false);
+
+    moved({ point: { x: 10, y: 10 } });
+    toggled({ enabled: false, shape: "circle" });
+    await nextTick();
+    expect(cursorHint().exists()).toBe(false);
+    expect(callout().text()).toMatch(/Choose a shape/);
+  });
+
+  it("[behavior] explains the edit tools once there's a shape", async () => {
+    mocks.datasetStore.geoJson = {
+      type: "Feature",
+      properties: {},
+      geometry: { type: "Point", coordinates: [-108.5, 37] },
+    } as any;
+    const wrapper = mount(MapLibre, { global: { stubs: uiStubs } });
+    await flushPromises();
+    const handlers = mocks.mapInstances[0].eventHandlers;
+    const callout = () => wrapper.find('[data-test="draw-callout"]');
+    const cursorHint = () => wrapper.find('[data-test="draw-cursor-hint"]');
+    expect(callout().text()).toMatch(/Draw a new shape to replace this one/);
+
+    handlers.mousemove[0]({ point: { x: 120, y: 80 } });
+    // geoman calls the change mode "edit" in its events.
+    const [changeToggled] = handlers["gm:globaleditmodetoggled"];
+    const [rotateToggled] = handlers["gm:globalrotatemodetoggled"];
+    changeToggled({ enabled: true });
+    await nextTick();
+    expect(cursorHint().text()).toBe("Drag a corner to change the shape.");
+    expect(callout().exists()).toBe(false);
+
+    // Switching tools may report the new one before the old one ends.
+    rotateToggled({ enabled: true });
+    changeToggled({ enabled: false });
+    await nextTick();
+    expect(cursorHint().text()).toBe("Drag a corner to rotate the shape.");
+
+    rotateToggled({ enabled: false });
+    await nextTick();
+    expect(cursorHint().exists()).toBe(false);
+    expect(callout().exists()).toBe(true);
+  });
+
+  it("[behavior] zooms to a point shape without zooming all the way in", async () => {
+    vi.useFakeTimers();
+    mocks.datasetStore.geoJson = {
+      type: "Feature",
+      properties: {},
+      geometry: { type: "Point", coordinates: [-108.5, 37] },
+    } as any;
+    mount(MapLibre, { global: { stubs: uiStubs } });
+    await vi.runAllTimersAsync();
+    const map = mocks.mapInstances[0];
+    map.fitBounds.mockClear();
+
+    const [zoomed] = map.eventHandlers["gm:globalzoom_to_featuresmodetoggled"];
+    zoomed({ enabled: true });
+    vi.runAllTimers();
+    vi.useRealTimers();
+
     expect(map.fitBounds).toHaveBeenCalledWith(
       [
         [-108.5, 37],

@@ -11,28 +11,6 @@
         <!-- No readout while selecting: the API measures the area on extraction. -->
         <AreaReadout v-if="!isSelectArea" class="my-auto" />
         <v-spacer />
-        <v-alert
-          v-if="isSelectArea"
-          density="compact"
-          variant="tonal"
-          icon="mdi-pencil"
-          color="secondary"
-          class="my-auto"
-        >
-          Use the draw toolbar on the left to select an area of study.
-        </v-alert>
-        <v-select
-          v-model="selectedBaseLayerId"
-          :items="baseLayerOptions"
-          item-title="title"
-          item-value="value"
-          label="Base map"
-          density="compact"
-          variant="outlined"
-          hide-details
-          class="mx-2 my-auto basemap-select"
-        />
-        <v-spacer />
         <input
           v-if="isSelectArea"
           id="loadGeoJsonFile"
@@ -41,48 +19,79 @@
           style="display: none"
           @change="loadGeoJson"
         >
-        <v-tooltip
+        <v-btn
           v-if="isSelectArea"
-          location="bottom"
-          text="Upload study area from GeoJSON"
+          size="small"
+          color="secondary"
+          variant="outlined"
+          prepend-icon="mdi-upload"
+          class="my-auto"
+          @click="selectGeoJsonFile"
         >
-          <template #activator="{ props }">
-            <v-btn
-              size="small"
-              color="secondary"
-              variant="outlined"
-              v-bind="props"
-              class="my-auto"
-              @click="selectGeoJsonFile"
-            >
-              <v-icon>mdi-upload</v-icon>
-            </v-btn>
-          </template>
-        </v-tooltip>
-        <v-tooltip
+          Upload GeoJSON
+        </v-btn>
+        <v-btn
           v-if="isSelectArea"
-          location="bottom"
-          text="Download selected area as GeoJSON"
+          size="small"
+          color="secondary"
+          variant="flat"
+          prepend-icon="mdi-download"
+          class="mx-2 my-auto"
+          @click="exportSelectedGeometry"
         >
-          <template #activator="{ props }">
-            <v-btn
-              size="small"
-              color="secondary"
-              variant="flat"
-              v-bind="props"
-              class="mx-2 my-auto"
-              @click="exportSelectedGeometry"
-            >
-              <a id="exportSelectedGeometry">
-                <v-icon>mdi-download</v-icon>
-              </a>
-            </v-btn>
-          </template>
-        </v-tooltip>
+          <a id="exportSelectedGeometry">Download GeoJSON</a>
+        </v-btn>
       </v-row>
     </v-toolbar>
     <v-card-text class="map">
-      <div ref="mapContainer" class="maplibre-map" />
+      <div class="map-frame">
+        <div ref="mapContainer" class="maplibre-map" />
+        <div
+          v-if="isSelectArea && !activeTool"
+          class="draw-callout"
+          data-test="draw-callout"
+        >
+          {{ datasetStore.geoJson ? EDIT_CALLOUT : DRAW_CALLOUT }}
+        </div>
+        <div
+          v-if="cursorHint && drawPointer"
+          class="draw-cursor-hint"
+          :style="{ left: `${drawPointer.x}px`, top: `${drawPointer.y}px` }"
+          data-test="draw-cursor-hint"
+        >
+          {{ cursorHint }}
+        </div>
+      </div>
+      <!-- Sits in MapLibre's top-right control stack, under the zoom buttons. -->
+      <Teleport v-if="basemapControlEl" :to="basemapControlEl">
+        <v-menu location="start top">
+          <template #activator="{ props: menuProps }">
+            <button
+              v-bind="menuProps"
+              type="button"
+              title="Base map"
+              aria-label="Base map"
+              data-test="basemap-button"
+            >
+              <v-icon size="18">
+                mdi-layers-outline
+              </v-icon>
+            </button>
+          </template>
+          <v-list density="compact">
+            <v-list-subheader>Base map</v-list-subheader>
+            <v-list-item
+              v-for="option in baseLayerOptions"
+              :key="option.value"
+              :title="option.title"
+              :active="option.value === selectedBaseLayerId"
+              color="primary"
+              data-test="basemap-option"
+              @click="selectedBaseLayerId = option.value"
+            />
+          </v-list>
+        </v-menu>
+      </Teleport>
       <div v-if="isStepLoading" class="map-step-loading">
         <v-progress-circular
           indeterminate
@@ -104,7 +113,6 @@ import { SkopeColorbar, type ColorbarOptions } from "@/utils/SkopeColorbar";
 import { timestepKey } from "@/utils/timeAxis";
 import type { Geoman } from "@geoman-io/maplibre-geoman-free";
 import { createGeomanInstance } from "@geoman-io/maplibre-geoman-free";
-import circleToPolygon from "circle-to-polygon";
 import { bbox as turfBbox } from "@turf/turf";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "@geoman-io/maplibre-geoman-free/dist/maplibre-geoman.css";
@@ -127,7 +135,6 @@ let colorbar: SkopeColorbar | null = null;
 const props = defineProps({
   step: { type: Number, default: 2000 },
   displayRaster: { type: Boolean, default: true },
-  circleToPolygonEdges: { type: Number, default: 32 },
 });
 const emit = defineEmits(["mapReady", "stepReady"]);
 
@@ -146,6 +153,13 @@ const currentStep = computed(() =>
   stepNames.value.findIndex((x: unknown) => x === route.name),
 );
 const isSelectArea = computed(() => currentStep.value === 1);
+const activeTool = ref<string | null>(null);
+// The active tool's instruction follows the pointer, where the user is looking
+// while drawing or editing.
+const cursorHint = computed(
+  () => activeTool.value && TOOL_INSTRUCTIONS[activeTool.value],
+);
+const drawPointer = ref<{ x: number; y: number } | null>(null);
 
 const cogBaseUrl = computed(getCogBaseUrl);
 const legendVisible = computed(() => props.displayRaster && !!cogBaseUrl.value);
@@ -212,6 +226,7 @@ const defaultBaseLayer =
   mapBaseLayers.find((provider) => provider.name === DEFAULT_BASEMAP) ??
   mapBaseLayers[0];
 const selectedBaseLayerId = ref(defaultBaseLayer?.id ?? "");
+const basemapControlEl = ref<HTMLElement | null>(null);
 const baseLayerOptions = computed(() =>
   mapBaseLayers.map((provider) => ({
     title: provider.name,
@@ -220,6 +235,58 @@ const baseLayerOptions = computed(() =>
 );
 
 const STEP_DISPLAY_DURATION_MS = 1000;
+
+// What to do with each tool, keyed by geoman's mode name. Every drawing tool
+// works by clicking, not by dragging. Shown on the tool's tooltip and next to
+// the pointer while the tool is active.
+const DRAW_INSTRUCTIONS: Record<string, string> = {
+  marker: "Click the map to place the point.",
+  circle: "Click the center, then click again to set the radius.",
+  rectangle: "Click one corner, then click the opposite corner.",
+  polygon: "Click each corner, then click the first one again to finish.",
+};
+const EDIT_INSTRUCTIONS: Record<string, string> = {
+  drag: "Drag the shape to move it.",
+  change: "Drag a corner to change the shape.",
+  rotate: "Drag a corner to rotate the shape.",
+  delete: "Click the shape to remove it.",
+};
+const TOOL_INSTRUCTIONS = { ...DRAW_INSTRUCTIONS, ...EDIT_INSTRUCTIONS };
+// Shown next to the draw toolbar while no tool is active.
+const DRAW_CALLOUT =
+  "Choose a shape to draw your study area, or upload a GeoJSON file.";
+const EDIT_CALLOUT =
+  "Draw a new shape to replace this one, or use the tools below to drag, change, rotate or delete it.";
+
+// A study area is a polygon, rectangle, circle or point; hide geoman's other
+// drawing tools. Cutting a hole in the one shape isn't useful. Snapping stays
+// on without its button: it lets a polygon close on a click near its first
+// corner.
+const GEOMAN_OPTIONS = {
+  controls: {
+    draw: {
+      marker: { title: `Point: ${DRAW_INSTRUCTIONS.marker}` },
+      circle: { title: `Circle: ${DRAW_INSTRUCTIONS.circle}` },
+      rectangle: { title: `Rectangle: ${DRAW_INSTRUCTIONS.rectangle}` },
+      polygon: { title: `Polygon: ${DRAW_INSTRUCTIONS.polygon}` },
+      circle_marker: { uiEnabled: false },
+      text_marker: { uiEnabled: false },
+      ellipse: { uiEnabled: false },
+      line: { uiEnabled: false },
+    },
+    edit: {
+      drag: { title: `Drag: ${EDIT_INSTRUCTIONS.drag}` },
+      change: { title: `Change: ${EDIT_INSTRUCTIONS.change}` },
+      rotate: { title: `Rotate: ${EDIT_INSTRUCTIONS.rotate}` },
+      delete: { title: `Delete: ${EDIT_INSTRUCTIONS.delete}` },
+      cut: { uiEnabled: false },
+    },
+    helper: {
+      snapping: { uiEnabled: false, active: true },
+      zoom_to_features: { title: "Zoom to shape" },
+    },
+  },
+};
 
 let map: maplibregl.Map | null = null;
 let gm: Geoman | null = null;
@@ -442,41 +509,6 @@ function normalizeGeoJson(geoJson: any): any {
   return null;
 }
 
-function normalizeGeoJsonForImport(geoJson: any): any {
-  const featureCollection = normalizeGeoJson(geoJson);
-  if (!featureCollection) return null;
-
-  return {
-    ...featureCollection,
-    features: featureCollection.features.map((feature: any) =>
-      convertCircleToPolygon(feature),
-    ),
-  };
-}
-
-function convertCircleToPolygon(feature: any): any {
-  if (!feature?.geometry || feature.geometry.type !== "Circle") return feature;
-
-  const [lon, lat] = feature.geometry.coordinates || [0, 0];
-  const radiusKm = (feature.geometry.radius || 1000) / 1000;
-
-  try {
-    const polygon = circleToPolygon([lon, lat], radiusKm, {
-      numberOfEdges: props.circleToPolygonEdges,
-    });
-    return {
-      ...feature,
-      geometry: polygon.geometry,
-      properties: {
-        ...feature.properties,
-        originalShape: "circle",
-      },
-    };
-  } catch {
-    return feature;
-  }
-}
-
 function fitToGeoJson(geoJson: any) {
   if (!map || !geoJson) return;
   try {
@@ -576,7 +608,7 @@ function updateStudyAreaDisplay(geoJson: any) {
   if (!source) return;
 
   const featureCollection =
-    normalizeGeoJsonForImport(geoJson) || emptyFeatureCollection();
+    normalizeGeoJson(geoJson) || emptyFeatureCollection();
   source.setData(featureCollection as any);
   bringStudyAreaDisplayToFront();
 
@@ -598,7 +630,7 @@ function syncDrawFromStore(geoJson: any) {
       try {
         await gm.features.deleteAll();
 
-        const featureCollection = normalizeGeoJsonForImport(geoJsonToSync);
+        const featureCollection = normalizeGeoJson(geoJsonToSync);
         if (featureCollection && featureCollection.features.length > 0) {
           await gm.features.importGeoJson(featureCollection);
           fitToGeoJson(featureCollection);
@@ -611,15 +643,29 @@ function syncDrawFromStore(geoJson: any) {
   return syncDrawQueue;
 }
 
+const EDIT_EVENT_MODES: Record<string, string> = {
+  drag: "drag",
+  change: "edit",
+  rotate: "rotate",
+  delete: "delete",
+};
+
+// Switching tools can report the new one before the old one ends, so only the
+// active tool's end clears it.
+function setActiveTool(tool: string, enabled: boolean) {
+  if (enabled) activeTool.value = tool;
+  else if (activeTool.value === tool) activeTool.value = null;
+}
+
+// geoman emits every shape as standard GeoJSON; a circle arrives as a Polygon.
 function handleGmCreate(event: any) {
   if (ignoreStoreWatch) return;
 
   const geoJson = event.feature?.getGeoJson?.();
   if (!geoJson) return;
 
-  const normalizedFeature = convertCircleToPolygon(geoJson);
-  legacyActions.saveGeoJson(normalizedFeature);
-  fitToGeoJson(normalizedFeature);
+  legacyActions.saveGeoJson(geoJson);
+  fitToGeoJson(geoJson);
 }
 
 function handleGmEditEnd(event: any) {
@@ -628,8 +674,7 @@ function handleGmEditEnd(event: any) {
   const geoJson = event.feature?.getGeoJson?.();
   if (!geoJson) return;
 
-  const normalizedFeature = convertCircleToPolygon(geoJson);
-  legacyActions.saveGeoJson(normalizedFeature);
+  legacyActions.saveGeoJson(geoJson);
 }
 
 function handleGmRemove() {
@@ -714,6 +759,21 @@ onMounted(() => {
   });
 
   map.addControl(new maplibregl.NavigationControl(), "top-right");
+  map.addControl(
+    {
+      onAdd: () => {
+        const el = document.createElement("div");
+        el.className = "maplibregl-ctrl maplibregl-ctrl-group";
+        basemapControlEl.value = el;
+        return el;
+      },
+      onRemove: () => {
+        basemapControlEl.value?.remove();
+        basemapControlEl.value = null;
+      },
+    },
+    "top-right",
+  );
   map.addControl(new maplibregl.ScaleControl(), "bottom-right");
 
   map.on("load", async () => {
@@ -726,13 +786,36 @@ onMounted(() => {
     addCogRasterLayer(props.step);
 
     if (isSelectArea.value) {
-      gm = await createGeomanInstance(map as any, {});
-      await gm.addControls();
+      // createGeomanInstance adds the controls itself; adding them again only
+      // logs "controls already added".
+      gm = await createGeomanInstance(map as any, GEOMAN_OPTIONS);
       await syncDrawFromStore(datasetStore.geoJson);
 
       (map as any).on("gm:create", handleGmCreate);
       (map as any).on("gm:editend", handleGmEditEnd);
       (map as any).on("gm:remove", handleGmRemove);
+      // geoman's zoom has no maxZoom, so a point zoomed all the way in; zoom
+      // again once its fit has started, capped like every other fit.
+      (map as any).on("gm:globalzoom_to_featuresmodetoggled", (event: any) => {
+        if (event.enabled) {
+          setTimeout(() => fitToGeoJson(datasetStore.geoJson));
+        }
+      });
+      (map as any).on("gm:globaldrawmodetoggled", (event: any) =>
+        setActiveTool(event.shape, event.enabled),
+      );
+      // geoman names the change mode's event "edit".
+      for (const [tool, eventMode] of Object.entries(EDIT_EVENT_MODES)) {
+        (map as any).on(`gm:global${eventMode}modetoggled`, (event: any) =>
+          setActiveTool(tool, event.enabled),
+        );
+      }
+      map.on("mousemove", (event) => {
+        drawPointer.value = { x: event.point.x, y: event.point.y };
+      });
+      map.on("mouseout", () => {
+        drawPointer.value = null;
+      });
     } else {
       updateStudyAreaDisplay(pendingStudyAreaGeoJson ?? datasetStore.geoJson);
       pendingStudyAreaGeoJson = null;
@@ -848,9 +931,29 @@ onUnmounted(() => {
   overflow: visible;
 }
 
+.map-frame {
+  position: relative;
+  height: 100%;
+  width: 100%;
+}
+
 .maplibre-map {
   height: 100%;
   width: 100%;
+}
+
+.draw-cursor-hint {
+  position: absolute;
+  z-index: 5;
+  transform: translate(16px, 16px);
+  max-width: 260px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: none;
 }
 
 .map-step-loading {
@@ -864,9 +967,20 @@ onUnmounted(() => {
   pointer-events: none;
 }
 
-.basemap-select {
-  max-width: 220px;
-  min-width: 180px;
+.draw-callout {
+  position: absolute;
+  top: 10px;
+  /* Just right of geoman's draw toolbar. */
+  left: 52px;
+  z-index: 5;
+  max-width: 280px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+  font-size: 13px;
+  line-height: 1.4;
+  pointer-events: none;
 }
 
 :deep(.maplibregl-ctrl-group) {
