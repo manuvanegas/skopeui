@@ -1,172 +1,190 @@
 <template>
   <v-card variant="outlined" class="time-series-card">
-    <v-card-text class="time-series-card__content">
-      <div class="time-series-toolbar">
-        <div
-          v-if="showArea"
-          class="time-series-toolbar__group time-series-toolbar__group--metrics"
+    <PanelHeader>
+      <AreaReadout v-if="showArea" />
+      <v-form
+        v-model="isTemporalRangeValid"
+        class="time-series-range"
+        @click="enableTemporalRangeEdit"
+      >
+        <v-text-field
+          v-model.number="formTemporalRangeMin"
+          class="time-series-range-field"
+          label="From"
+          density="compact"
+          variant="outlined"
+          hide-details="auto"
+          :disabled="!isTemporalRangeEditable"
+          :min="minStep"
+          :max="maxStep - 1"
+          type="number"
+          :rules="[validateMinStep]"
+          @keydown.enter="setTemporalRange"
+        />
+        <v-text-field
+          v-model.number="formTemporalRangeMax"
+          class="time-series-range-field"
+          label="To"
+          density="compact"
+          variant="outlined"
+          hide-details="auto"
+          :disabled="!isTemporalRangeEditable"
+          :min="minStep + 1"
+          :max="maxStep"
+          :rules="[validateMaxStep]"
+          type="number"
+          @keydown.enter="setTemporalRange"
+        />
+        <v-btn
+          :disabled="!hasTemporalRangeChanges || !isTemporalRangeValid"
+          size="small"
+          color="secondary"
+          @click="setTemporalRange"
         >
-          <AreaReadout />
-        </div>
+          Apply
+        </v-btn>
+        <v-btn size="small" color="secondary" @click="resetTemporalRange">
+          Reset
+        </v-btn>
+        <span class="time-series-range-steps">{{ timeStepsLabel }}</span>
+      </v-form>
+    </PanelHeader>
 
-        <v-form
-          v-model="isTemporalRangeValid"
-          class="time-series-toolbar__group time-series-toolbar__range"
-          @click="enableTemporalRangeEdit"
+    <div
+      class="time-series-plot-shell"
+      :class="{ 'time-series-plot-shell--last': !showStepControls }"
+    >
+      <div
+        v-if="timeSeriesRequestStatus.status === 'loading'"
+        class="timeseries-loading-overlay"
+      >
+        <v-progress-circular
+          indeterminate
+          color="primary"
+          size="52"
+          width="4"
+        />
+        <p class="loading-message mt-4">{{ loadingMessage }}</p>
+      </div>
+      <client-only placeholder="Loading...">
+        <template
+          v-if="
+            timeSeriesRequestStatus.status !== 'success' &&
+            timeSeriesRequestStatus.status !== 'loading'
+          "
         >
-          <v-text-field
-            v-model.number="formTemporalRangeMin"
-            class="time-series-range-field"
-            label="From"
-            :disabled="!isTemporalRangeEditable"
-            :min="minStep"
-            :max="maxStep - 1"
-            type="number"
-            :rules="[validateMinStep]"
-            @keydown.enter="setTemporalRange"
+          <v-alert
+            v-for="(message, index) in timeSeriesRequestStatus.messages.filter(
+              (m) => m.type !== 'error',
+            )"
+            :key="index"
+            :type="message.type"
+            class="mb-2"
           >
-            <template #append-outer>to</template>
-          </v-text-field>
-          <v-text-field
-            v-model.number="formTemporalRangeMax"
-            class="time-series-range-field"
-            label="To"
-            :disabled="!isTemporalRangeEditable"
-            :hint="timeStepsLabel"
-            persistent-hint
-            :min="minStep + 1"
-            :max="maxStep"
-            :rules="[validateMaxStep]"
-            type="number"
-            @keydown.enter="setTemporalRange"
-          />
-          <div class="time-series-range-buttons">
+            {{ message.value }}
+          </v-alert>
+        </template>
+        <Plotly
+          ref="plotlyRef"
+          class="time-series"
+          :data="timeSeriesData"
+          :layout="layoutMetadata"
+          :options="options"
+          @click="updatePlotlyStep"
+        />
+      </client-only>
+    </div>
+
+    <!-- The current timestep sits between the buttons that change it, centred
+         under the plot; the x-axis title already says "Timestep". Play sits
+         at the left edge. -->
+    <div v-if="showStepControls" class="time-series-step-controls">
+      <v-tooltip
+        location="top"
+        :text="isAnimationPlaying ? 'Pause animation' : 'Animate layers'"
+      >
+        <template #activator="{ props }">
+          <v-btn
+            icon
+            size="small"
+            v-bind="props"
+            class="time-series-play"
+            @click="togglePlay"
+          >
+            <v-icon color="accent">{{ playIcon }}</v-icon>
+          </v-btn>
+        </template>
+      </v-tooltip>
+      <div class="time-series-pager">
+        <v-tooltip
+          location="top"
+          text="Go to the first timestep of the defined temporal range"
+        >
+          <template #activator="{ props }">
             <v-btn
-              :disabled="!hasTemporalRangeChanges || !isTemporalRangeValid"
-              size="x-small"
-              color="secondary"
-              @click="setTemporalRange"
+              icon
+              size="small"
+              v-bind="props"
+              color="accent"
+              @click="gotoFirstStep"
             >
-              Apply
+              <v-icon>mdi-skip-previous</v-icon>
             </v-btn>
-            <v-btn size="x-small" color="secondary" @click="resetTemporalRange">
-              Reset
-            </v-btn>
-          </div>
-        </v-form>
-
-        <div
-          v-if="showStepControls"
-          class="time-series-toolbar__group time-series-toolbar__group--actions"
-        >
-          <v-tooltip
-            location="top"
-            text="Go to the first timestep of the defined temporal range"
-          >
-            <template #activator="{ props }">
-              <v-btn icon v-bind="props" color="accent" @click="gotoFirstStep">
-                <v-icon>mdi-skip-previous</v-icon>
-              </v-btn>
-            </template>
-          </v-tooltip>
-          <v-tooltip location="top" text="Previous timestep">
-            <template #activator="{ props }">
-              <v-btn icon v-bind="props" color="accent" @click="previousStep">
-                <v-icon>mdi-chevron-left</v-icon>
-              </v-btn>
-            </template>
-          </v-tooltip>
-          <v-tooltip
-            location="top"
-            :text="isAnimationPlaying ? 'Pause animation' : 'Animate layers'"
-          >
-            <template #activator="{ props }">
-              <v-btn icon v-bind="props" @click="togglePlay">
-                <v-icon color="accent">{{ playIcon }}</v-icon>
-              </v-btn>
-            </template>
-          </v-tooltip>
-          <v-tooltip location="top" text="Next timestep">
-            <template #activator="{ props }">
-              <v-btn icon v-bind="props" color="accent" @click="nextStep">
-                <v-icon>mdi-chevron-right</v-icon>
-              </v-btn>
-            </template>
-          </v-tooltip>
-          <v-tooltip
-            location="top"
-            text="Go to the last timestep of the defined temporal range"
-          >
-            <template #activator="{ props }">
-              <v-btn icon v-bind="props" color="accent" @click="gotoLastStep">
-                <v-icon>mdi-skip-next</v-icon>
-              </v-btn>
-            </template>
-          </v-tooltip>
-        </div>
-
-        <div
-          class="time-series-toolbar__group time-series-toolbar__group--actions"
-        >
-          <v-tooltip location="top" text="Return to Select Area">
-            <template #activator="{ props }">
-              <v-btn
-                v-bind="props"
-                :to="selectAreaLocation"
-                color="accent"
-                size="small"
-              >
-                <v-icon size="small">mdi-map-marker</v-icon>
-              </v-btn>
-            </template>
-          </v-tooltip>
-        </div>
-      </div>
-
-      <div class="time-series-plot-shell">
-        <div
-          v-if="timeSeriesRequestStatus.status === 'loading'"
-          class="timeseries-loading-overlay"
-        >
-          <v-progress-circular
-            indeterminate
-            color="primary"
-            size="52"
-            width="4"
-          />
-          <p class="loading-message mt-4">{{ loadingMessage }}</p>
-        </div>
-        <client-only placeholder="Loading...">
-          <template
-            v-if="
-              timeSeriesRequestStatus.status !== 'success' &&
-              timeSeriesRequestStatus.status !== 'loading'
-            "
-          >
-            <v-alert
-              v-for="(
-                message, index
-              ) in timeSeriesRequestStatus.messages.filter(
-                (m) => m.type !== 'error',
-              )"
-              :key="index"
-              :type="message.type"
-              class="mb-2"
-            >
-              {{ message.value }}
-            </v-alert>
           </template>
-          <Plotly
-            ref="plotlyRef"
-            class="time-series"
-            :data="timeSeriesData"
-            :layout="layoutMetadata"
-            :options="options"
-            @click="updatePlotlyStep"
-          />
-        </client-only>
+        </v-tooltip>
+        <v-tooltip location="top" text="Previous timestep">
+          <template #activator="{ props }">
+            <v-btn
+              icon
+              size="small"
+              v-bind="props"
+              color="accent"
+              @click="previousStep"
+            >
+              <v-icon>mdi-chevron-left</v-icon>
+            </v-btn>
+          </template>
+        </v-tooltip>
+        <!-- Changes with these buttons, or by clicking the plot. -->
+        <span
+          class="time-series-current-step"
+          :style="{ minWidth: currentStepWidth }"
+          title="Current timestep"
+          data-test="current-step"
+        >
+          {{ stepSelected }}
+        </span>
+        <v-tooltip location="top" text="Next timestep">
+          <template #activator="{ props }">
+            <v-btn
+              icon
+              size="small"
+              v-bind="props"
+              color="accent"
+              @click="nextStep"
+            >
+              <v-icon>mdi-chevron-right</v-icon>
+            </v-btn>
+          </template>
+        </v-tooltip>
+        <v-tooltip
+          location="top"
+          text="Go to the last timestep of the defined temporal range"
+        >
+          <template #activator="{ props }">
+            <v-btn
+              icon
+              size="small"
+              v-bind="props"
+              color="accent"
+              @click="gotoLastStep"
+            >
+              <v-icon>mdi-skip-next</v-icon>
+            </v-btn>
+          </template>
+        </v-tooltip>
       </div>
-    </v-card-text>
+    </div>
   </v-card>
 </template>
 
@@ -180,8 +198,8 @@ import {
   defineAsyncComponent,
 } from "vue";
 import _ from "lodash";
-import { useRoute } from "vue-router";
 import AreaReadout from "@/components/dataset/AreaReadout.vue";
+import PanelHeader from "@/components/dataset/PanelHeader.vue";
 import { useDatasetStore } from "@/stores/dataset";
 import { axisYears, stepAlongAxis } from "@/utils/timeAxis";
 
@@ -205,7 +223,6 @@ const Plotly = defineAsyncComponent(
 );
 
 const datasetStore = useDatasetStore();
-const route = useRoute();
 
 // Local state
 const animationSpeed = ref(2000);
@@ -262,6 +279,13 @@ const timeSeriesRequestStatus = computed(
 const axis = computed(() =>
   datasetStore.metadata ? axisYears(datasetStore.metadata.time) : [],
 );
+// As wide as the longest timestep on the axis (a year now; a date such as
+// 2000-01-01 once finer axes are read), so the buttons don't shift as it
+// changes.
+const currentStepWidth = computed(() => {
+  const longest = Math.max(1, ...axis.value.map((step) => `${step}`.length));
+  return `${longest + 0.5}ch`;
+});
 const minStep = computed(() => datasetStore.minYear);
 const maxStep = computed(() => datasetStore.maxYear);
 const variable = computed(() => datasetStore.variable as any);
@@ -310,12 +334,6 @@ const timeStepsLabel = computed(() => {
   return `${steps} time steps`;
 });
 
-const xAxisTitle = computed(() =>
-  props.stepSelected == null
-    ? "Timestep"
-    : `<b>Timestep ${props.stepSelected}</b>`,
-);
-
 const yAxisTitle = computed(() => {
   if (props.yAxisLabel) return props.yAxisLabel;
   const { title, unit } = variable.value;
@@ -345,7 +363,7 @@ const layoutMetadata = computed(() => ({
   showlegend: hasMultipleTimeSeries.value,
   legend: { x: 1, y: 0.5 },
   xaxis: {
-    title: xAxisTitle.value,
+    title: "Timestep",
     linewidth: 3,
     gridwidth: 3,
     automargin: true,
@@ -369,11 +387,6 @@ const options = computed(() => ({
 const playIcon = computed(() =>
   isAnimationPlaying.value ? "mdi-pause-circle" : "mdi-play-circle",
 );
-
-const selectAreaLocation = computed(() => ({
-  name: "dataset-id",
-  params: { id: (route.params.id ?? "") as string },
-}));
 
 function getPlotlyApi() {
   const plotlyInstance = plotlyRef.value as any;
@@ -568,62 +581,31 @@ watch(layoutMetadata, (layout) => {
 </script>
 <style>
 .time-series-card {
+  display: flex;
+  flex-direction: column;
   width: 100%;
   height: 100%;
   min-width: 0;
 }
 
-.time-series-card__content {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  height: 100%;
-  min-height: 0;
-}
-
-.time-series-toolbar {
+.time-series-range {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.time-series-toolbar__group {
-  min-width: 0;
-}
-
-.time-series-toolbar__group--metrics {
-  display: flex;
-  flex: 0 1 auto;
   align-items: center;
-}
-
-.time-series-toolbar__range {
-  display: flex;
-  flex: 1 1 340px;
-  flex-wrap: wrap;
-  align-items: flex-start;
   gap: 8px;
 }
 
-.time-series-toolbar__group--actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-}
-
+/* A fixed width, so the range's row is sized from its contents and doesn't
+   wrap while there's room. */
 .time-series-range-field {
-  flex: 1 1 140px;
-  min-width: 140px;
-  max-width: 180px;
+  flex: 0 0 120px;
+  width: 120px;
 }
 
-.time-series-range-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding-top: 2px;
+.time-series-range-steps {
+  font-size: 0.875rem;
+  color: #596d7b;
+  white-space: nowrap;
 }
 
 .time-series-plot-shell {
@@ -632,6 +614,38 @@ watch(layoutMetadata, (layout) => {
   flex: 1 1 auto;
   flex-direction: column;
   min-height: 0;
+  padding: 16px 16px 0;
+}
+
+.time-series-plot-shell--last {
+  padding-bottom: 16px;
+}
+
+/* Its bottom padding matches the map card's, so the buttons end level with
+   the map. */
+.time-series-step-controls {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 8px 16px 16px;
+}
+
+.time-series-play {
+  justify-self: start;
+}
+
+.time-series-pager {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.time-series-current-step {
+  font-size: 1.125rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 .timeseries-loading-overlay {
@@ -655,11 +669,5 @@ watch(layoutMetadata, (layout) => {
   flex: 1 1 auto;
   width: 100%;
   min-height: 320px;
-}
-
-@media all and (max-width: 960px) {
-  .time-series-range-field {
-    max-width: none;
-  }
 }
 </style>

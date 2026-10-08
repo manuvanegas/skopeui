@@ -1,49 +1,45 @@
 <template>
   <v-card
-    class="pb-2"
+    class="map-card"
     height="100%"
     width="100%"
     elevation="1"
     variant="outlined"
   >
-    <v-toolbar variant="flat" class="ma-0 pa-0">
-      <v-row class="mx-0" align="baseline">
-        <!-- No readout while selecting: the API measures the area on extraction. -->
-        <AreaReadout v-if="!isSelectArea" class="my-auto" />
-        <v-spacer />
-        <input
-          v-if="isSelectArea"
-          id="loadGeoJsonFile"
-          type="file"
-          accept=".geojson"
-          style="display: none"
-          @change="loadGeoJson"
-        >
-        <v-btn
-          v-if="isSelectArea"
-          size="small"
-          color="secondary"
-          variant="outlined"
-          prepend-icon="mdi-upload"
-          class="my-auto"
-          @click="selectGeoJsonFile"
-        >
-          Upload GeoJSON
-        </v-btn>
-        <v-btn
-          v-if="isSelectArea"
-          size="small"
-          color="secondary"
-          variant="flat"
-          :disabled="!datasetStore.geoJson"
-          prepend-icon="mdi-download"
-          class="mx-2 my-auto"
-          @click="exportSelectedGeometry"
-        >
-          <a id="exportSelectedGeometry">Download GeoJSON</a>
-        </v-btn>
-      </v-row>
-    </v-toolbar>
+    <PanelHeader>
+      <!-- No readout while selecting: the API measures the area on extraction. -->
+      <AreaReadout v-if="!isSelectArea" />
+      <v-spacer />
+      <input
+        v-if="isSelectArea"
+        id="loadGeoJsonFile"
+        type="file"
+        accept=".geojson"
+        style="display: none"
+        @change="loadGeoJson"
+      >
+      <v-btn
+        v-if="isSelectArea"
+        size="small"
+        color="secondary"
+        variant="outlined"
+        prepend-icon="mdi-upload"
+        @click="selectGeoJsonFile"
+      >
+        Upload GeoJSON
+      </v-btn>
+      <v-btn
+        v-if="isSelectArea"
+        size="small"
+        color="secondary"
+        variant="flat"
+        :disabled="!datasetStore.geoJson"
+        prepend-icon="mdi-download"
+        @click="exportSelectedGeometry"
+      >
+        <a id="exportSelectedGeometry">Download GeoJSON</a>
+      </v-btn>
+    </PanelHeader>
     <v-card-text class="map">
       <div class="map-frame">
         <div ref="mapContainer" class="maplibre-map" />
@@ -110,6 +106,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import maplibregl from "maplibre-gl";
 import AreaReadout from "@/components/dataset/AreaReadout.vue";
+import PanelHeader from "@/components/dataset/PanelHeader.vue";
 import { SkopeColorbar, type ColorbarOptions } from "@/utils/SkopeColorbar";
 import { timestepKey } from "@/utils/timeAxis";
 import type { Geoman } from "@geoman-io/maplibre-geoman-free";
@@ -925,8 +922,16 @@ onUnmounted(() => {
   color: inherit;
 }
 
+.map-card {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The map fills the card below the header, so its bottom edge lines up with
+   the bottom of the plot card's step controls. */
 .map {
-  height: calc(95% - 48px);
+  flex: 1 1 auto;
+  min-height: 0;
   position: relative;
   z-index: 1;
   overflow: visible;

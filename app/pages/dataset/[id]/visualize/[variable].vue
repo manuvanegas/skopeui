@@ -6,6 +6,15 @@
         <v-col class="pa-0 ma-0">
           <SubHeader :select-variable="true">
             <v-btn
+              :to="selectAreaLocation"
+              color="accent"
+              variant="outlined"
+              class="mr-2"
+            >
+              <v-icon class="mr-2" size="small"> mdi-chevron-left </v-icon>
+              Select Area
+            </v-btn>
+            <v-btn
               :disabled="!hasValidStudyArea"
               :to="analyzeLocation"
               color="accent"
@@ -84,6 +93,10 @@ const timeSeriesPlotRef = ref();
 let stopTimeSeriesWatch: (() => void) | null = null;
 
 const hasValidStudyArea = computed(() => datasetStore.hasGeoJson);
+const selectAreaLocation = computed(() => ({
+  name: "dataset-id",
+  params: { id: route.params.id },
+}));
 const analyzeLocation = computed(() => ({
   name: "dataset-id-analyze-variable",
   params: { id: route.params.id, variable: route.params.variable },

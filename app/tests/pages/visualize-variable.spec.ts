@@ -82,7 +82,10 @@ const layoutStubs = {
   "v-container": { template: "<div><slot /></div>" },
   "v-row": { template: "<div><slot /></div>" },
   "v-col": { template: "<div><slot /></div>" },
-  "v-btn": { template: "<button><slot /></button>" },
+  "v-btn": {
+    props: ["to"],
+    template: '<button :data-to="to && JSON.stringify(to)"><slot /></button>',
+  },
   "v-icon": { template: "<i><slot /></i>" },
 };
 
@@ -132,6 +135,20 @@ describe("route /dataset/:id/visualize/:variable", () => {
     expect(page.findComponent({ name: "TimeSeriesPlotStub" }).exists()).toBe(
       true,
     );
+  });
+
+  it("[behavior] goes back to select area", async () => {
+    const wrapper = await mountWithSuspense(VisualizePage, {
+      global: { stubs: layoutStubs },
+    });
+    await flushPromises();
+
+    const back = wrapper
+      .findAll("button")
+      .find((b) => b.text().includes("Select Area"))!;
+    expect(JSON.parse(back.attributes("data-to")!)).toMatchObject({
+      name: "dataset-id",
+    });
   });
 
   it("[behavior] loads time-series data on mount", async () => {

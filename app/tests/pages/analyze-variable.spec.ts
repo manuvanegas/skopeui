@@ -91,8 +91,9 @@ const layoutStubs = {
   "v-text-field": { template: '<input data-test="input" />' },
   "v-icon": { template: "<i><slot /></i>" },
   "v-btn": {
+    props: ["to"],
     template:
-      '<button data-test="action-btn" @click="$emit(\'click\')"><slot /></button>',
+      '<button data-test="action-btn" :data-to="to && JSON.stringify(to)" @click="$emit(\'click\')"><slot /></button>',
   },
 };
 
@@ -148,6 +149,20 @@ describe("route /dataset/:id/analyze/:variable", () => {
     expect(page.findComponent({ name: "TimeSeriesPlotStub" }).exists()).toBe(
       true,
     );
+  });
+
+  it("[behavior] goes back to visualize, not select area", async () => {
+    const wrapper = await mountWithSuspense(AnalyzePage, {
+      global: { stubs: layoutStubs },
+    });
+    await flushPromises();
+
+    const back = wrapper
+      .findAll("button")
+      .find((b) => b.text().includes("Visualize"))!;
+    expect(JSON.parse(back.attributes("data-to")!)).toMatchObject({
+      name: "dataset-id-visualize-variable",
+    });
   });
 
   it("[behavior] submits updated request data when Update is clicked", async () => {

@@ -35,8 +35,8 @@
         variant="outlined"
       />
     </v-col>
-    <v-col cols="3" class="ml-auto" align="end">
-      <!-- slot for next nav button -->
+    <v-col cols="auto" class="ml-auto" align="end">
+      <!-- slot for the back and next nav buttons -->
       <slot />
     </v-col>
   </v-row>

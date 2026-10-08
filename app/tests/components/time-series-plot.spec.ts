@@ -16,9 +16,9 @@ vi.mock("@/components/dataset/PlotlyClient.vue", () => ({
 
 const passThrough = { template: "<div><slot /></div>" };
 
-function mountPlot() {
+function mountPlot(props: Record<string, unknown> = {}) {
   return mount(TimeSeriesPlot, {
-    props: { traces: [] },
+    props: { traces: [], ...props },
     global: {
       stubs: {
         "client-only": passThrough,
@@ -74,5 +74,35 @@ describe("TimeSeriesPlot loading messages", () => {
     vi.advanceTimersByTime(30_000);
     await flushPromises();
     expect(wrapper.find(".loading-message").exists()).toBe(false);
+  });
+});
+
+describe("TimeSeriesPlot step controls", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  it("shows the current timestep between the step buttons", async () => {
+    const wrapper = mountPlot({ showStepControls: true, stepSelected: 1500 });
+    await flushPromises();
+    expect(wrapper.find('[data-test="current-step"]').text()).toBe("1500");
+  });
+
+  it("sizes the current timestep to the longest one on the axis", async () => {
+    const store = useDatasetStore();
+    store.metadata = {
+      time: { kind: "regular", origin: "0001", end: "2000", step: "P1Y" },
+    } as any;
+    const wrapper = mountPlot({ showStepControls: true, stepSelected: 7 });
+    await flushPromises();
+    expect(
+      wrapper.find('[data-test="current-step"]').attributes("style"),
+    ).toContain("min-width: 4.5ch");
+  });
+
+  it("has no step controls on analyze", async () => {
+    const wrapper = mountPlot({ showStepControls: false });
+    await flushPromises();
+    expect(wrapper.find('[data-test="current-step"]').exists()).toBe(false);
   });
 });
