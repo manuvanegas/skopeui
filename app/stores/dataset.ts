@@ -1,6 +1,8 @@
 import { defineStore } from "pinia";
 import { summarize, toISODate } from "@/store/stats";
 import area from "@turf/area";
+import type { Dataset, Variable } from "@/types/metadata";
+import { timeSpan } from "@/utils/timeAxis";
 
 const DEFAULT_MAX_PROCESSING_TIME = 10000;
 
@@ -42,19 +44,15 @@ function selectedAreaInSquareKmFromGeoJson(geoJson: unknown): string {
   }
 }
 
-type DatasetVariable = {
+// The legacy rendering fields go when the map reads `display`.
+type DatasetVariable = Partial<Variable> & {
   id: string | null;
-  name?: string;
-  class?: string;
   units?: string;
-  description?: string;
-  styles?: string;
   min?: number;
   max?: number;
-  visible?: boolean;
   colormap?: string;
   colormap_stops?: string[];
-} & Record<string, unknown>;
+};
 
 export const useDatasetStore = defineStore("dataset", {
   state: () => ({
@@ -64,7 +62,7 @@ export const useDatasetStore = defineStore("dataset", {
       options: { name: "Original" as string },
     },
     hasData: false,
-    metadata: null as unknown,
+    metadata: null as Dataset | null,
     variable: { id: null } as DatasetVariable,
     geoJson: null as unknown,
     hasGeoJson: false,
@@ -97,11 +95,11 @@ export const useDatasetStore = defineStore("dataset", {
       };
     },
     geoJsonKey: (state) => {
-      const metadataId = (state.metadata as any)?.id;
+      const metadataId = state.metadata?.id;
       return metadataId ? `geojson:${metadataId}` : "skope:geometry";
     },
     defaultApiRequestData: (state) => {
-      const metadata = state.metadata as any;
+      const metadata = state.metadata;
       const variable = state.variable;
       const [minYear, maxYear] = state.temporalRange;
       return {
@@ -126,14 +124,10 @@ export const useDatasetStore = defineStore("dataset", {
   },
   actions: {
     setVariable(variableId: string) {
-      const metadata = this.metadata as any;
-      if (metadata?.variables) {
-        for (const variable of metadata.variables) {
-          variable.visible = variable.id === variableId;
-          if (variable.visible) {
-            this.variable = variable;
-          }
-        }
+      const variables = this.metadata?.variables;
+      if (variables) {
+        const variable = variables.find((v) => v.id === variableId);
+        if (variable) this.variable = variable;
       } else {
         this.variable = { id: variableId };
       }
@@ -145,15 +139,10 @@ export const useDatasetStore = defineStore("dataset", {
       this.temporalRangeMax = temporalRange[1];
       this.timeSeriesRequestData = this.defaultApiRequestData;
     },
-    setMetadata(metadata: unknown) {
+    setMetadata(metadata: Dataset | null) {
       this.metadata = metadata;
-      const m = metadata as any;
-      if (m?.timespan?.period) {
-        this.minYear = parseInt(m.timespan.period.gte || "1", 10);
-        this.maxYear = parseInt(
-          m.timespan.period.lte || `${new Date().getFullYear()}`,
-          10,
-        );
+      if (metadata?.time) {
+        [this.minYear, this.maxYear] = timeSpan(metadata.time);
         this.temporalRange = [this.minYear, this.maxYear];
         this.temporalRangeMin = this.minYear;
         this.temporalRangeMax = this.maxYear;

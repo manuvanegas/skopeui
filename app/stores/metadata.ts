@@ -1,43 +1,34 @@
 import { defineStore } from "pinia";
 import type { Dataset } from "@/types/metadata";
+import { timeSpan } from "@/utils/timeAxis";
 
-function matchesYearFilter(minYear: number, maxYear: number, dataset: any) {
-  const dMinYear = parseInt(dataset?.timespan?.period?.gte || "0", 10);
-  const dMaxYear = parseInt(dataset?.timespan?.period?.lte || "0", 10);
-  if (dMaxYear < minYear) {
-    return false;
-  }
-  return dMinYear <= maxYear;
+function matchesYearFilter(minYear: number, maxYear: number, dataset: Dataset) {
+  const [start, end] = timeSpan(dataset.time);
+  return end >= minYear && start <= maxYear;
 }
 
-function matchesVariableFilter(
-  selectedVariableClasses: string[],
-  dataset: any,
-) {
-  if (selectedVariableClasses.length === 0) {
+function matchesCategoryFilter(selectedCategories: string[], dataset: Dataset) {
+  if (selectedCategories.length === 0) {
     return true;
   }
-  for (const selectedVariableClass of selectedVariableClasses) {
-    for (const variable of dataset?.variables || []) {
-      if (variable.class === selectedVariableClass) {
-        return true;
-      }
-    }
-  }
-  return false;
+  return dataset.variables.some(
+    (variable) =>
+      variable.category != null &&
+      selectedCategories.includes(variable.category),
+  );
 }
 
-function matchesQueryFilter(query: string, dataset: any) {
+function matchesQueryFilter(query: string, dataset: Dataset) {
   if (query.length === 0) {
     return true;
   }
   const q = query.toLowerCase();
-  const variableCorpus = (dataset?.variables || [])
-    .map((v: any) => `${v.class} ${v.name} ${v.description}`.toLowerCase())
+  const variableCorpus = dataset.variables
+    .map((v) => `${v.category ?? ""} ${v.title} ${v.description}`.toLowerCase())
     .join(" ");
   return (
-    (dataset?.title || "").toLowerCase().includes(q) ||
-    (dataset?.description || "").toLowerCase().includes(q) ||
+    dataset.title.toLowerCase().includes(q) ||
+    dataset.description.toLowerCase().includes(q) ||
     variableCorpus.includes(q)
   );
 }
@@ -49,7 +40,7 @@ export const useMetadataStore = defineStore("metadata", {
     allDatasetMetadata: [] as Dataset[],
     filteredDatasets: [] as Dataset[],
     filterCriteria: {
-      selectedVariableClasses: [] as string[],
+      selectedCategories: [] as string[],
       yearStart: 1,
       yearEnd: new Date().getFullYear(),
       query: "",
@@ -65,18 +56,16 @@ export const useMetadataStore = defineStore("metadata", {
     setUpdateRequired() {
       this.updateRequired = true;
     },
+    // The API sends datasets already sorted by `order`, then ID.
     setAllDatasetMetadata(datasets: Dataset[]) {
-      const sorted = [...datasets].sort(
-        (a: any, b: any) => (a.ordering || 0) - (b.ordering || 0),
-      );
-      this.allDatasetMetadata = sorted;
-      this.filteredDatasets = sorted;
+      this.allDatasetMetadata = datasets;
+      this.filteredDatasets = datasets;
     },
     setFilteredDatasets(datasets: Dataset[]) {
       this.filteredDatasets = datasets;
     },
     setFilterCriteria(filterCriteria: {
-      selectedVariableClasses: string[];
+      selectedCategories: string[];
       yearStart: number;
       yearEnd: number;
       query?: string;
@@ -86,8 +75,7 @@ export const useMetadataStore = defineStore("metadata", {
         query: filterCriteria.query || "",
       };
       this.filteredDatasets = this.allDatasetMetadata.filter((dataset) => {
-        const selectedVariableClasses =
-          this.filterCriteria.selectedVariableClasses;
+        const selectedCategories = this.filterCriteria.selectedCategories;
         const minYear = this.filterCriteria.yearStart;
         const maxYear = this.filterCriteria.yearEnd;
         const query = this.filterCriteria.query || "";
@@ -95,7 +83,7 @@ export const useMetadataStore = defineStore("metadata", {
         return (
           matchesYearFilter(minYear, maxYear, dataset) &&
           matchesQueryFilter(query, dataset) &&
-          matchesVariableFilter(selectedVariableClasses, dataset)
+          matchesCategoryFilter(selectedCategories, dataset)
         );
       });
     },

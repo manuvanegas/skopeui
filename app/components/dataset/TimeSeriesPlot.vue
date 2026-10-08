@@ -339,8 +339,9 @@ const xAxisTitle = computed(() =>
 );
 
 const yAxisTitle = computed(() => {
-  const variableName = variable.value.name;
-  return !props.yAxisLabel ? variableName : `${props.yAxisLabel}`;
+  if (props.yAxisLabel) return props.yAxisLabel;
+  const { title, unit } = variable.value;
+  return unit ? `${title} (${unit})` : title;
 });
 
 const shapes = computed(() => {

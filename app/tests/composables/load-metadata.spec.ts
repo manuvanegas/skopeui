@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
 import { useLegacyStoreActions } from "@/composables/useLegacyStoreActions";
+import { useDatasetStore } from "@/stores/dataset";
 import { useMetadataStore } from "@/stores/metadata";
 import metadataFixture from "@/tests/fixtures/metadata-1.0.0.json";
 
@@ -48,5 +49,47 @@ describe("loadAllDatasetMetadata", () => {
     await actions.loadAllDatasetMetadata();
 
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("initializeDataset", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("selects the dataset's default variable when the URL names none", async () => {
+    const [paleocar] = metadataFixture.datasets;
+    serve({
+      ...metadataFixture,
+      datasets: [{ ...paleocar, default_variable: "gdd_cotton_annual" }],
+    });
+    await useLegacyStoreActions().initializeDataset("paleocar_v3");
+
+    expect(useDatasetStore().variable.id).toBe("gdd_cotton_annual");
+  });
+
+  it("falls back to the first variable without a default", async () => {
+    const [paleocar] = metadataFixture.datasets;
+    serve({
+      ...metadataFixture,
+      datasets: [{ ...paleocar, default_variable: null }],
+    });
+    await useLegacyStoreActions().initializeDataset("paleocar_v3");
+
+    expect(useDatasetStore().variable.id).toBe("ppt_annual");
+  });
+
+  it("keeps the variable the URL names", async () => {
+    serve(metadataFixture);
+    await useLegacyStoreActions().initializeDataset(
+      "paleocar_v3",
+      "gdd_cotton_annual",
+    );
+
+    expect(useDatasetStore().variable.id).toBe("gdd_cotton_annual");
   });
 });

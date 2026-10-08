@@ -4,11 +4,11 @@
     <v-list-item
       v-for="(variable, index) in safeVariables"
       :key="index"
-      :title="variable.name"
+      :title="variable.title"
     >
-      <template #prepend>
+      <template v-if="variable.category" #prepend>
         <v-chip size="small" label color="primary" class="mr-2">
-          {{ variable.class }}
+          {{ variable.category }}
         </v-chip>
       </template>
     </v-list-item>
@@ -17,9 +17,10 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import type { Variable } from "@/types/metadata";
 
 const props = defineProps<{
-  variables?: Array<{ class: string; name: string }> | null;
+  variables?: Variable[] | null;
 }>();
 
 const safeVariables = computed(() => props.variables ?? []);

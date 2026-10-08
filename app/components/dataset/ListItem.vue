@@ -39,10 +39,10 @@
           <span v-html="$md.render(safeDescription)" />
         </v-card-text>
         <VariableList :variables="safeVariables" />
-        <v-card-text class="ma-0 pa-0">
+        <v-card-text v-if="sourceLink" class="ma-0 pa-0">
           <b class="text-subtitle-1">Source:</b>
-          <a target="_blank" :href="sourceUrl">
-            {{ sourceUrl }}
+          <a target="_blank" :href="sourceLink.href">
+            {{ sourceLink.title ?? sourceLink.href }}
           </a>
         </v-card-text>
       </v-card>
@@ -55,32 +55,27 @@ import { computed } from "vue";
 import { BaseMapProvider } from "@/store/modules/constants";
 import MetadataModal from "@/components/dataset/MetadataModal.vue";
 import VariableList from "@/components/dataset/VariableList.vue";
+import type { OverviewLink, Time, Variable } from "@/types/metadata";
+import { timeCoverageLabel } from "@/utils/timeAxis";
 
 const props = defineProps<{
   title: string;
-  status?: string;
-  revised?: string;
-  region: {
-    name: string;
-    resolution: string;
+  region_name: string;
+  resolution_label: string;
+  time: Time;
+  links: OverviewLink[];
+  region?: {
     zoom: number;
     center: any;
     extents: any;
     style?: any;
   };
-  timespan: {
-    period: { gte: string; lte: string; suffix?: string };
-    resolutionLabel: string;
-  };
   description: string;
   id: string;
-  sourceUrl?: string;
-  variables?: Array<{ class: string; name: string }>;
+  variables: Variable[];
 }>();
 
 const safeRegion = computed(() => ({
-  name: props.region?.name ?? "Unknown region",
-  resolution: props.region?.resolution ?? "unknown resolution",
   zoom: props.region?.zoom ?? 2,
   center: props.region?.center ?? [0, 0],
   extents: props.region?.extents ?? [
@@ -94,14 +89,13 @@ const safeDescription = computed(() => props.description ?? "");
 const safeVariables = computed(() => props.variables ?? []);
 
 const spatialCoverage = computed(
-  () => `${safeRegion.value.name} at ${safeRegion.value.resolution}`,
+  () => `${props.region_name} at ${props.resolution_label}`,
 );
-const temporalCoverage = computed(() => {
-  const period = props.timespan?.period ?? { gte: "", lte: "", suffix: "" };
-  const timespan =
-    period.gte === period.lte ? period.gte : `${period.gte}-${period.lte}`;
-  return `${timespan}${period.suffix ?? ""} ${props.timespan?.resolutionLabel ?? ""}`;
-});
+const temporalCoverage = computed(() => timeCoverageLabel(props.time));
+// STAC's "via" link points at the source the dataset was taken from.
+const sourceLink = computed(() =>
+  props.links.find((link) => link.rel === "via"),
+);
 const absoluteUrl = computed(() => `/dataset/${props.id}`);
 </script>
 <style scoped>

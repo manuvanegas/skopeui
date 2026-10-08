@@ -1,12 +1,12 @@
 <template>
   <v-form @submit.prevent>
     <v-row class="mb-n7" align="center" justify="center">
-      <!-- filter by variable -->
+      <!-- filter by variable category -->
       <v-col cols="12" md="3" sm="6">
         <v-combobox
-          v-model="selectedVariableClasses"
+          v-model="selectedCategories"
           no-filter
-          :items="variableClasses"
+          :items="categories"
           label="Filter by variable"
           multiple
           chips
@@ -14,16 +14,16 @@
           @update:model-value="filterDatasets"
           @blur="filterDatasets"
         >
-          <template #chip="{ item: variableClass, props: chipProps }">
+          <template #chip="{ item: category, props: chipProps }">
             <v-chip v-bind="chipProps" color="primary" label size="small">
-              {{ variableClass.title ?? variableClass }}
+              {{ category.title ?? category }}
             </v-chip>
           </template>
-          <template #item="{ item: variableClass, props: itemProps }">
+          <template #item="{ item: category, props: itemProps }">
             <v-list-item v-bind="itemProps">
               <template #title>
                 <v-chip color="primary" label size="small">
-                  {{ variableClass.title ?? variableClass }}
+                  {{ category.title ?? category }}
                 </v-chip>
               </template>
             </v-list-item>
@@ -81,7 +81,7 @@ const currentYear = new Date().getFullYear();
 const keywordSearchQuery = ref("");
 const startYear = ref(1);
 const endYear = ref(currentYear);
-const selectedVariableClasses = ref<string[]>([]);
+const selectedCategories = ref<string[]>([]);
 const minYear = 1;
 const maxYear = currentYear;
 
@@ -103,19 +103,19 @@ const endYearRules = computed(() => [
     v <= maxYear || `Please enter a valid end year before ${maxYear}`,
 ]);
 
-const variableClasses = computed(() => {
-  const variableClassSet = new Set<string>();
-  for (const dataset of metadataStore.allDatasetMetadata as any[]) {
-    for (const variable of dataset.variables || []) {
-      variableClassSet.add(variable.class);
+const categories = computed(() => {
+  const categorySet = new Set<string>();
+  for (const dataset of metadataStore.allDatasetMetadata) {
+    for (const variable of dataset.variables) {
+      if (variable.category != null) categorySet.add(variable.category);
     }
   }
-  return Array.from(variableClassSet);
+  return Array.from(categorySet);
 });
 
 function filterDatasets() {
   const criteria = {
-    selectedVariableClasses: selectedVariableClasses.value,
+    selectedCategories: selectedCategories.value,
     yearStart: startYear.value,
     yearEnd: endYear.value,
     query: keywordSearchQuery.value,

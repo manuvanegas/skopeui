@@ -30,7 +30,7 @@
         color="secondary"
         density="compact"
         :items="variables"
-        item-title="name"
+        item-title="title"
         item-value="id"
         variant="outlined"
       />

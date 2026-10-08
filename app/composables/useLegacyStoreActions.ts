@@ -86,10 +86,11 @@ export function useLegacyStoreActions() {
 
     datasetStore.setMetadata(datasetMetadata);
 
+    // The variables arrive sorted by `order`, so the first is the fallback.
     const incomingVariableId =
-      variableId == null
-        ? (datasetMetadata as any).variables?.[0]?.id
-        : variableId;
+      variableId ??
+      datasetMetadata.default_variable ??
+      datasetMetadata.variables[0]?.id;
 
     if (incomingVariableId != null) {
       datasetStore.setVariable(incomingVariableId);

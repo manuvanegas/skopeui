@@ -6,6 +6,8 @@ import { useAppStore } from "@/stores/app";
 import { useDatasetStore } from "@/stores/dataset";
 import { useMessagesStore } from "@/stores/messages";
 import { useMetadataStore } from "@/stores/metadata";
+import type { Dataset } from "@/types/metadata";
+import metadataFixture from "@/tests/fixtures/metadata-1.0.0.json";
 
 describe("migrated pinia stores", () => {
   beforeEach(() => {
@@ -63,8 +65,8 @@ describe("migrated pinia stores", () => {
     expect(store.temporalRangeMin).toBe(1901);
     expect(store.temporalRangeMax).toBe(1910);
 
-    store.setMetadata({ id: "paleocar" });
-    expect(store.metadata).toEqual({ id: "paleocar" });
+    store.setMetadata(metadataFixture.datasets[0] as Dataset);
+    expect(store.metadata?.id).toBe("paleocar_v3");
 
     store.setGeoJson({ type: "FeatureCollection", features: [] });
     expect(store.hasGeoJson).toBe(true);
@@ -95,17 +97,18 @@ describe("migrated pinia stores", () => {
   it("dataset store legacy parity methods update status and derived fields", () => {
     const store = useDatasetStore();
 
-    store.setMetadata({
-      id: "paleocar",
-      timespan: { period: { gte: "1", lte: "2000" } },
-      variables: [{ id: "ppt", name: "PPT" }],
-    });
-    store.setVariable("ppt");
+    store.setMetadata(metadataFixture.datasets[0] as Dataset);
+    store.setVariable("gdd_cotton_annual");
     store.setGeoJson({ type: "FeatureCollection", features: [] });
 
-    expect(store.geoJsonKey).toBe("geojson:paleocar");
-    expect(store.defaultApiRequestData.dataset_id).toBe("paleocar");
-    expect(store.defaultApiRequestData.variable_id).toBe("ppt");
+    expect(store.minYear).toBe(103);
+    expect(store.maxYear).toBe(2000);
+    expect(store.variable.title).toBe(
+      "Annual (Jan–Dec) Cotton Growing Degree Days",
+    );
+    expect(store.geoJsonKey).toBe("geojson:paleocar_v3");
+    expect(store.defaultApiRequestData.dataset_id).toBe("paleocar_v3");
+    expect(store.defaultApiRequestData.variable_id).toBe("gdd_cotton_annual");
 
     store.setTimeSeriesLoading();
     expect(store.timeSeriesRequestStatus.status).toBe("loading");
@@ -141,12 +144,8 @@ describe("migrated pinia stores", () => {
   it("dataset store preserves already constrained time series without double filtering", () => {
     const store = useDatasetStore();
 
-    store.setMetadata({
-      id: "paleocar",
-      timespan: { period: { gte: "1", lte: "2000" } },
-      variables: [{ id: "ppt", name: "PPT" }],
-    });
-    store.setVariable("ppt");
+    store.setMetadata(metadataFixture.datasets[0] as Dataset);
+    store.setVariable("ppt_annual");
     store.setTemporalRange([100, 102]);
     store.setTimeSeries({
       timeSeries: {
@@ -184,40 +183,48 @@ describe("migrated pinia stores", () => {
 
   it("metadata store flags an update and filters datasets", () => {
     const store = useMetadataStore();
-    store.setAllDatasetMetadata([
-      {
-        id: "paleocar",
-        ordering: 2,
-        title: "PaleoCAR",
-        description: "rain-fed maize",
-        timespan: { period: { gte: "1", lte: "2000" } },
-        variables: [
-          { class: "Precipitation", name: "ppt", description: "precip" },
-        ],
-      },
-      {
-        id: "lbda",
-        ordering: 1,
-        title: "LBDA",
-        description: "drought index",
-        timespan: { period: { gte: "1", lte: "2017" } },
-        variables: [{ class: "Drought", name: "pmdi", description: "index" }],
-      },
-    ]);
+    const [paleocar] = metadataFixture.datasets as Dataset[];
+    const lbda: Dataset = {
+      ...paleocar,
+      id: "lbda",
+      title: "LBDA",
+      description: "drought index",
+      time: { ...paleocar.time, origin: "0001", end: "2017" },
+      variables: [
+        {
+          ...paleocar.variables[0],
+          id: "pmdi",
+          title: "PMDI",
+          category: "Drought",
+          description: "index",
+        },
+      ],
+    };
+    store.setAllDatasetMetadata([lbda, paleocar]);
 
-    expect(store.allDatasetMetadata[0].id).toBe("lbda");
+    expect(store.allDatasetMetadata.map((d) => d.id)).toEqual([
+      "lbda",
+      "paleocar_v3",
+    ]);
     expect(store.updateRequired).toBe(false);
 
     store.setUpdateRequired();
     expect(store.updateRequired).toBe(true);
 
     store.setFilterCriteria({
-      selectedVariableClasses: ["Precipitation"],
+      selectedCategories: ["Precipitation"],
       yearStart: 1,
       yearEnd: 2005,
-      query: "maize",
+      query: "tree-ring",
     });
-    expect(store.filteredDatasets.map((d) => d.id)).toEqual(["paleocar"]);
+    expect(store.filteredDatasets.map((d) => d.id)).toEqual(["paleocar_v3"]);
+
+    store.setFilterCriteria({
+      selectedCategories: [],
+      yearStart: 2001,
+      yearEnd: 2017,
+    });
+    expect(store.filteredDatasets.map((d) => d.id)).toEqual(["lbda"]);
   });
 
   it("analysis store updates request/response/loading state", () => {
