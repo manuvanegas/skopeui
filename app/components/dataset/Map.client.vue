@@ -6,7 +6,6 @@
     :display-raster="displayRaster"
     v-bind="mapComponent === LeafletMap ? { circleToPolygonEdges } : {}"
     @map-ready="emit('mapReady', $event)"
-    @step-ready="emit('stepReady')"
   />
 </template>
 
@@ -22,7 +21,7 @@ const props = defineProps({
   circleToPolygonEdges: { type: Number, default: 32 },
   mapEngine: { type: String, default: null },
 });
-const emit = defineEmits(["mapReady", "stepReady"]);
+const emit = defineEmits(["mapReady"]);
 
 const route = useRoute();
 const runtimeConfig = useRuntimeConfig();

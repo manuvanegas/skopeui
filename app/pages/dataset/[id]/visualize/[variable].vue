@@ -39,7 +39,6 @@
             :step="stepSelected"
             :display-raster="true"
             map-engine="maplibre"
-            @step-ready="onStepReady"
           />
         </v-col>
         <!-- time series plot -->
@@ -51,7 +50,6 @@
           align-self="stretch"
         >
           <TimeSeriesPlot
-            ref="timeSeriesPlotRef"
             :show-step-controls="true"
             :traces="traces"
             :step-selected="stepSelected"
@@ -89,7 +87,6 @@ const messageStore = useMessagesStore();
 const legacyActions = useLegacyStoreActions();
 
 const stepSelected = ref(1500);
-const timeSeriesPlotRef = ref();
 let stopTimeSeriesWatch: (() => void) | null = null;
 
 const hasValidStudyArea = computed(() => datasetStore.hasGeoJson);
@@ -110,10 +107,6 @@ const traces = computed(() => {
 
 function setStep(step: number) {
   stepSelected.value = step;
-}
-
-function onStepReady() {
-  timeSeriesPlotRef.value?.advanceAnimation();
 }
 
 async function updateTimeSeries(data: any) {

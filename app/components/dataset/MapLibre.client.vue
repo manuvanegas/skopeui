@@ -134,7 +134,7 @@ const props = defineProps({
   step: { type: Number, default: 2000 },
   displayRaster: { type: Boolean, default: true },
 });
-const emit = defineEmits(["mapReady", "stepReady"]);
+const emit = defineEmits(["mapReady"]);
 
 const route = useRoute();
 const appStore = useAppStore();
@@ -232,8 +232,6 @@ const baseLayerOptions = computed(() =>
   })),
 );
 
-const STEP_DISPLAY_DURATION_MS = 1000;
-
 // What to do with each tool, keyed by geoman's mode name. Every drawing tool
 // works by clicking, not by dragging. Shown on the tool's tooltip and next to
 // the pointer while the tool is active.
@@ -292,7 +290,6 @@ let ignoreStoreWatch = false;
 let syncDrawQueue: Promise<void> = Promise.resolve();
 let isMapLoaded = false;
 let pendingStudyAreaGeoJson: any = null;
-let stepDisplayTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const COG_A = { sourceId: "cog-source-a", layerId: "cog-layer-a" };
 const COG_B = { sourceId: "cog-source-b", layerId: "cog-layer-b" };
@@ -407,10 +404,6 @@ function removeCogSlot(slot: typeof COG_A) {
 }
 
 function cancelPendingSwap() {
-  if (stepDisplayTimeout) {
-    clearTimeout(stepDisplayTimeout);
-    stepDisplayTimeout = null;
-  }
   if (pendingIdleSwap) {
     map?.off("idle", pendingIdleSwap);
     pendingIdleSwap = null;
@@ -455,10 +448,6 @@ function updateRasterLayer(step: number) {
     [cogFront, cogBack] = [cogBack, cogFront]; // swap references
     pendingIdleSwap = null;
     isStepLoading.value = false;
-    stepDisplayTimeout = setTimeout(() => {
-      stepDisplayTimeout = null;
-      emit("stepReady");
-    }, STEP_DISPLAY_DURATION_MS);
   };
   map.once("idle", pendingIdleSwap);
 }
@@ -893,10 +882,6 @@ watch(cogBaseUrl, (url) => {
 onUnmounted(() => {
   isMapLoaded = false;
   pendingStudyAreaGeoJson = null;
-  if (stepDisplayTimeout) {
-    clearTimeout(stepDisplayTimeout);
-    stepDisplayTimeout = null;
-  }
   if (pendingIdleSwap && map) {
     map.off("idle", pendingIdleSwap);
     pendingIdleSwap = null;

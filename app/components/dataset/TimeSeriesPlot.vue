@@ -96,94 +96,75 @@
     </div>
 
     <!-- The current timestep sits between the buttons that change it, centred
-         under the plot; the x-axis title already says "Timestep". Play sits
-         at the left edge. -->
+         under the plot; the x-axis title already says "Timestep". -->
     <div v-if="showStepControls" class="time-series-step-controls">
       <v-tooltip
         location="top"
-        :text="isAnimationPlaying ? 'Pause animation' : 'Animate layers'"
+        text="Go to the first timestep of the defined temporal range"
       >
         <template #activator="{ props }">
           <v-btn
             icon
             size="small"
             v-bind="props"
-            class="time-series-play"
-            @click="togglePlay"
+            color="accent"
+            @click="gotoFirstStep"
           >
-            <v-icon color="accent">{{ playIcon }}</v-icon>
+            <v-icon>mdi-skip-previous</v-icon>
           </v-btn>
         </template>
       </v-tooltip>
-      <div class="time-series-pager">
-        <v-tooltip
-          location="top"
-          text="Go to the first timestep of the defined temporal range"
-        >
-          <template #activator="{ props }">
-            <v-btn
-              icon
-              size="small"
-              v-bind="props"
-              color="accent"
-              @click="gotoFirstStep"
-            >
-              <v-icon>mdi-skip-previous</v-icon>
-            </v-btn>
-          </template>
-        </v-tooltip>
-        <v-tooltip location="top" text="Previous timestep">
-          <template #activator="{ props }">
-            <v-btn
-              icon
-              size="small"
-              v-bind="props"
-              color="accent"
-              @click="previousStep"
-            >
-              <v-icon>mdi-chevron-left</v-icon>
-            </v-btn>
-          </template>
-        </v-tooltip>
-        <!-- Changes with these buttons, or by clicking the plot. -->
-        <span
-          class="time-series-current-step"
-          :style="{ minWidth: currentStepWidth }"
-          title="Current timestep"
-          data-test="current-step"
-        >
-          {{ stepSelected }}
-        </span>
-        <v-tooltip location="top" text="Next timestep">
-          <template #activator="{ props }">
-            <v-btn
-              icon
-              size="small"
-              v-bind="props"
-              color="accent"
-              @click="nextStep"
-            >
-              <v-icon>mdi-chevron-right</v-icon>
-            </v-btn>
-          </template>
-        </v-tooltip>
-        <v-tooltip
-          location="top"
-          text="Go to the last timestep of the defined temporal range"
-        >
-          <template #activator="{ props }">
-            <v-btn
-              icon
-              size="small"
-              v-bind="props"
-              color="accent"
-              @click="gotoLastStep"
-            >
-              <v-icon>mdi-skip-next</v-icon>
-            </v-btn>
-          </template>
-        </v-tooltip>
-      </div>
+      <v-tooltip location="top" text="Previous timestep">
+        <template #activator="{ props }">
+          <v-btn
+            icon
+            size="small"
+            v-bind="props"
+            color="accent"
+            @click="previousStep"
+          >
+            <v-icon>mdi-chevron-left</v-icon>
+          </v-btn>
+        </template>
+      </v-tooltip>
+      <!-- Changes with these buttons, or by clicking the plot. -->
+      <span
+        class="time-series-current-step"
+        :style="{ minWidth: currentStepWidth }"
+        title="Current timestep"
+        data-test="current-step"
+      >
+        {{ stepSelected }}
+      </span>
+      <v-tooltip location="top" text="Next timestep">
+        <template #activator="{ props }">
+          <v-btn
+            icon
+            size="small"
+            v-bind="props"
+            color="accent"
+            @click="nextStep"
+          >
+            <v-icon>mdi-chevron-right</v-icon>
+          </v-btn>
+        </template>
+      </v-tooltip>
+      <v-tooltip
+        location="top"
+        text="Go to the last timestep of the defined temporal range"
+      >
+        <template #activator="{ props }">
+          <v-btn
+            icon
+            size="small"
+            v-bind="props"
+            color="accent"
+            @click="gotoLastStep"
+          >
+            <v-icon>mdi-skip-next</v-icon>
+          </v-btn>
+        </template>
+      </v-tooltip>
     </div>
   </v-card>
 </template>
@@ -225,8 +206,6 @@ const Plotly = defineAsyncComponent(
 const datasetStore = useDatasetStore();
 
 // Local state
-const animationSpeed = ref(2000);
-const isAnimationPlaying = ref(false);
 const localTemporalRangeMin = ref(1);
 const localTemporalRangeMax = ref(new Date().getFullYear());
 const isTemporalRangeEditable = ref(false);
@@ -384,10 +363,6 @@ const options = computed(() => ({
   responsive: true,
 }));
 
-const playIcon = computed(() =>
-  isAnimationPlaying.value ? "mdi-pause-circle" : "mdi-play-circle",
-);
-
 function getPlotlyApi() {
   const plotlyInstance = plotlyRef.value as any;
   if (!plotlyInstance) {
@@ -492,22 +467,6 @@ function previousStep() {
   stepBy(-1);
 }
 
-function advanceAnimation() {
-  if (!isAnimationPlaying.value) return;
-  if ((props.stepSelected ?? 0) >= temporalRangeMax.value) {
-    isAnimationPlaying.value = false;
-    return;
-  }
-  nextStep();
-}
-
-function togglePlay() {
-  isAnimationPlaying.value = !isAnimationPlaying.value;
-  if (isAnimationPlaying.value) {
-    advanceAnimation(); // kick off first step; map drives the rest via advanceAnimation()
-  }
-}
-
 async function getTimeSeriesPlotImage() {
   const plotlyApi = getPlotlyApi();
   const svg = await plotlyApi?.toImage({
@@ -538,7 +497,7 @@ onUnmounted(() => {
   clearProgressiveMessages();
 });
 
-defineExpose({ getTimeSeriesPlotImage, advanceAnimation });
+defineExpose({ getTimeSeriesPlotImage });
 
 onMounted(() => {
   localTemporalRangeMin.value = selectedTemporalRange.value[0];
@@ -624,21 +583,12 @@ watch(layoutMetadata, (layout) => {
 /* Its bottom padding matches the map card's, so the buttons end level with
    the map. */
 .time-series-step-controls {
-  display: grid;
-  flex: 0 0 auto;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  padding: 8px 16px 16px;
-}
-
-.time-series-play {
-  justify-self: start;
-}
-
-.time-series-pager {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
+  justify-content: center;
   gap: 4px;
+  padding: 8px 16px 16px;
 }
 
 .time-series-current-step {
