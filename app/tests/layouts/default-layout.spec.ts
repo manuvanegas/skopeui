@@ -24,6 +24,7 @@ describe("default layout", () => {
           Header: true,
           Navigation: true,
           StepBar: true,
+          PageLoadingOverlay: true,
           Messages: true,
           Footer: true,
           NuxtPage: true,

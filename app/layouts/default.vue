@@ -6,8 +6,11 @@
       <v-container fluid>
         <StepBar v-if="mdAndUp" />
         <Messages />
-        <UpdateRequired v-if="metadataStore.updateRequired" />
-        <NuxtPage v-else />
+        <div class="page-area">
+          <UpdateRequired v-if="metadataStore.updateRequired" />
+          <NuxtPage v-else />
+          <PageLoadingOverlay />
+        </div>
       </v-container>
     </v-main>
     <div class="mt-6">
@@ -20,6 +23,7 @@
 import Header from "@/components/Header.vue";
 import Navigation from "@/components/Navigation.vue";
 import StepBar from "@/components/StepBar.vue";
+import PageLoadingOverlay from "@/components/PageLoadingOverlay.vue";
 import Messages from "@/components/Messages.vue";
 import Footer from "@/components/Footer.vue";
 import UpdateRequired from "@/components/UpdateRequired.vue";
@@ -40,3 +44,12 @@ watch(
   () => messagesStore.clearOnNavigation(),
 );
 </script>
+
+<style scoped>
+/* Holds the loading overlay over the page. Tall enough for it even when the
+   page being left has already cleared. */
+.page-area {
+  position: relative;
+  min-height: 50vh;
+}
+</style>
