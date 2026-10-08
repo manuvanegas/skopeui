@@ -4,7 +4,7 @@ import area from "@turf/area";
 import type { Dataset, Variable } from "@/types/metadata";
 import { timeSpan } from "@/utils/timeAxis";
 
-const DEFAULT_MAX_PROCESSING_TIME = 10000;
+const DEFAULT_MAX_PROCESSING_TIME = 20000;
 
 const LOADING_STATUS = {
   status: "loading",
