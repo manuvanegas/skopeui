@@ -67,7 +67,8 @@ export default defineNuxtConfig({
     },
     public: {
       gtagId: process.env.NUXT_PUBLIC_GTAG_ID || "G-M0NVBT90BT",
-      mapEngine: process.env.NUXT_PUBLIC_MAP_ENGINE || "leaflet",
+      // Leaflet stays reachable with ?map_engine=leaflet until it's removed.
+      mapEngine: process.env.NUXT_PUBLIC_MAP_ENGINE || "maplibre",
     },
   },
 
