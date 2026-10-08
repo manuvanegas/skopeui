@@ -5,6 +5,10 @@ import {
   TIMESERIES_REFINE_ENDPOINT,
 } from "../store/modules/constants";
 import { extractYear } from "../store/stats";
+import {
+  datasetsFromMetadata,
+  UnsupportedMetadataVersionError,
+} from "../utils/metadataResponse";
 import { useAnalysisStore } from "../stores/analysis";
 import { useDatasetStore } from "../stores/dataset";
 import { useMetadataStore } from "../stores/metadata";
@@ -45,13 +49,18 @@ export function useLegacyStoreActions() {
   const analysisStore = useAnalysisStore();
   const persistenceStorage = usePersistenceStorage();
 
+  // Fetched on every page load, not cached, so a UI left open across an API
+  // deploy notices a changed schema version on its next navigation (CUT-001).
   async function loadAllDatasetMetadata() {
-    if (!metadataStore.shouldRefresh) {
-      return;
+    const response = await requestJson(METADATA_ENDPOINT);
+    try {
+      metadataStore.setAllDatasetMetadata(datasetsFromMetadata(response));
+    } catch (error) {
+      if (error instanceof UnsupportedMetadataVersionError) {
+        metadataStore.setUpdateRequired();
+      }
+      throw error;
     }
-    const allDatasetMetadata = await requestJson(METADATA_ENDPOINT);
-    metadataStore.setAllDatasetMetadata(allDatasetMetadata as any[]);
-    metadataStore.setLastRefreshed();
   }
 
   async function initializeDataset(

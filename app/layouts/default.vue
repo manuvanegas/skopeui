@@ -5,7 +5,8 @@
     <v-main>
       <v-container fluid>
         <Messages />
-        <NuxtPage />
+        <UpdateRequired v-if="metadataStore.updateRequired" />
+        <NuxtPage v-else />
       </v-container>
     </v-main>
     <div class="mt-6">
@@ -19,4 +20,8 @@ import Header from "@/components/Header.vue";
 import Navigation from "@/components/Navigation.vue";
 import Messages from "@/components/Messages.vue";
 import Footer from "@/components/Footer.vue";
+import UpdateRequired from "@/components/UpdateRequired.vue";
+import { useMetadataStore } from "@/stores/metadata";
+
+const metadataStore = useMetadataStore();
 </script>

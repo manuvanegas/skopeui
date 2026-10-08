@@ -1,6 +1,5 @@
 import { defineStore } from "pinia";
-
-type MetadataItem = { id?: string } & Record<string, unknown>;
+import type { Dataset } from "@/types/metadata";
 
 function matchesYearFilter(minYear: number, maxYear: number, dataset: any) {
   const dMinYear = parseInt(dataset?.timespan?.period?.gte || "0", 10);
@@ -45,9 +44,10 @@ function matchesQueryFilter(query: string, dataset: any) {
 
 export const useMetadataStore = defineStore("metadata", {
   state: () => ({
-    lastRefreshed: null as Date | null,
-    allDatasetMetadata: [] as MetadataItem[],
-    filteredDatasets: [] as MetadataItem[],
+    // Set when the API serves a /metadata major version this UI can't read.
+    updateRequired: false,
+    allDatasetMetadata: [] as Dataset[],
+    filteredDatasets: [] as Dataset[],
     filterCriteria: {
       selectedVariableClasses: [] as string[],
       yearStart: 1,
@@ -55,15 +55,6 @@ export const useMetadataStore = defineStore("metadata", {
       query: "",
     },
   }),
-  getters: {
-    shouldRefresh: (state) => {
-      const maxRefreshTime = 3600000;
-      return (
-        state.lastRefreshed == null ||
-        new Date().getTime() - state.lastRefreshed.getTime() > maxRefreshTime
-      );
-    },
-  },
   actions: {
     find(metadataId: string) {
       return (
@@ -71,17 +62,17 @@ export const useMetadataStore = defineStore("metadata", {
         null
       );
     },
-    setLastRefreshed() {
-      this.lastRefreshed = new Date();
+    setUpdateRequired() {
+      this.updateRequired = true;
     },
-    setAllDatasetMetadata(datasets: MetadataItem[]) {
+    setAllDatasetMetadata(datasets: Dataset[]) {
       const sorted = [...datasets].sort(
         (a: any, b: any) => (a.ordering || 0) - (b.ordering || 0),
       );
       this.allDatasetMetadata = sorted;
       this.filteredDatasets = sorted;
     },
-    setFilteredDatasets(datasets: MetadataItem[]) {
+    setFilteredDatasets(datasets: Dataset[]) {
       this.filteredDatasets = datasets;
     },
     setFilterCriteria(filterCriteria: {

@@ -15,7 +15,6 @@ import IndexPage from "@/pages/index.vue";
 
 let datasetStore: any;
 let metadataStore: any;
-let messagesStore: any;
 let legacyActions: any;
 
 vi.mock("@/components/dataset/Search.vue", () => ({
@@ -39,10 +38,6 @@ vi.mock("@/stores/dataset", () => ({
 
 vi.mock("@/stores/metadata", () => ({
   useMetadataStore: () => metadataStore,
-}));
-
-vi.mock("@/stores/messages", () => ({
-  useMessagesStore: () => messagesStore,
 }));
 
 vi.mock("@/composables/useLegacyStoreActions", () => ({
@@ -72,9 +67,6 @@ describe("route /", () => {
         { ...datasetMetadataFixture, absoluteUrl: "/dataset/paleocar" },
       ],
     });
-    messagesStore = {
-      error: vi.fn(),
-    };
     legacyActions = {
       loadAllDatasetMetadata: vi.fn(async () => true),
     };
@@ -109,5 +101,21 @@ describe("route /", () => {
     const page = wrapper.findComponent(IndexPage);
 
     expect(page.text()).toContain("No datasets found");
+  });
+
+  it("[behavior] says the datasets failed to load instead of none found", async () => {
+    legacyActions.loadAllDatasetMetadata = vi.fn(async () => {
+      throw new Error("Request failed with status 500");
+    });
+    metadataStore.filteredDatasets = [];
+
+    const wrapper = await mountWithSuspense(IndexPage, {
+      global: { stubs: layoutStubs },
+    });
+    await nextTick();
+    const page = wrapper.findComponent(IndexPage);
+
+    expect(page.text()).toContain("Unable to load the datasets");
+    expect(page.text()).not.toContain("No datasets found");
   });
 });

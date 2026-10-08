@@ -182,7 +182,7 @@ describe("migrated pinia stores", () => {
     expect(store.find("missing")).toBeNull();
   });
 
-  it("metadata store supports refresh and filter criteria", () => {
+  it("metadata store flags an update and filters datasets", () => {
     const store = useMetadataStore();
     store.setAllDatasetMetadata([
       {
@@ -206,10 +206,10 @@ describe("migrated pinia stores", () => {
     ]);
 
     expect(store.allDatasetMetadata[0].id).toBe("lbda");
-    expect(store.shouldRefresh).toBe(true);
+    expect(store.updateRequired).toBe(false);
 
-    store.setLastRefreshed();
-    expect(store.shouldRefresh).toBe(false);
+    store.setUpdateRequired();
+    expect(store.updateRequired).toBe(true);
 
     store.setFilterCriteria({
       selectedVariableClasses: ["Precipitation"],
