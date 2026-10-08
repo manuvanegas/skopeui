@@ -14,21 +14,19 @@ const EMPTY_RESPONSE = {
 
 export const useAnalysisStore = defineStore("analysis", {
   state: () => ({
-    summaryStatistics: [] as any[],
     response: { ...EMPTY_RESPONSE } as any,
-    timeseries: [] as any[],
     requestData: {} as Record<string, unknown>,
-    responseError: {} as Record<string, unknown>,
   }),
+  // Derived from the response, so they can't outlive it.
   getters: {
-    derivedTimeseries: (state) => {
+    timeseries: (state) => {
       return (state.response?.series || []).map((s: any) => ({
         x: s.timesteps.map(yearOfTimestep),
         y: s.values,
         name: s.options?.name,
       }));
     },
-    derivedSummaryStatistics: (state) =>
+    summaryStatistics: (state) =>
       formatStats(state.response?.summary_stats || []),
   },
   actions: {
@@ -38,8 +36,10 @@ export const useAnalysisStore = defineStore("analysis", {
     },
     setResponse(response: Record<string, unknown>) {
       this.response = response;
-      this.timeseries = this.derivedTimeseries;
-      this.summaryStatistics = this.derivedSummaryStatistics;
+    },
+    /** Drops the last response, e.g. when the study area changes. */
+    clear() {
+      this.response = { ...EMPTY_RESPONSE };
     },
     setRequestData(requestData: Record<string, unknown>) {
       this.requestData = requestData;
@@ -49,9 +49,6 @@ export const useAnalysisStore = defineStore("analysis", {
         ...this.requestData,
         selected_area: geoJson,
       };
-    },
-    setResponseError(error: Record<string, unknown>) {
-      this.responseError = error;
     },
   },
 });

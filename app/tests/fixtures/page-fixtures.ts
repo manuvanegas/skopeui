@@ -94,7 +94,6 @@ export function createAnalysisStore(overrides: Record<string, unknown> = {}) {
   const store = reactive({
     requestData: null as unknown,
     response: null as unknown,
-    responseError: null as unknown,
     summaryStatistics: [] as unknown[],
     timeseries: [] as unknown[],
     setGeoJson: vi.fn(),
@@ -114,9 +113,7 @@ export function createAnalysisStore(overrides: Record<string, unknown> = {}) {
           y: series.values,
         })) ?? [];
     }),
-    setResponseError: vi.fn((value: unknown) => {
-      (store as any).responseError = value;
-    }),
+    clear: vi.fn(),
   });
 
   Object.assign(store, overrides);

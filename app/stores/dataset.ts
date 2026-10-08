@@ -215,6 +215,8 @@ export const useDatasetStore = defineStore("dataset", {
     },
     clearTimeSeries() {
       this.hasData = false;
+      // Back to the initial state: no "success" left over from the old data.
+      this.timeSeriesRequestStatus = { ...LOADING_STATUS };
       this.timeSeries = { x: [], y: [], options: { name: "Original" } };
       this.numberOfCells = 0;
       this.totalCellAreaInSquareKm = "0.00";

@@ -127,6 +127,7 @@ describe("migrated pinia stores", () => {
     store.clearTimeSeries();
     expect(store.timeSeries.x).toEqual([]);
     expect(store.numberOfCells).toBe(0);
+    expect(store.timeSeriesRequestStatus.status).toBe("loading");
 
     store.setTimeSeriesBadRequest([{ msg: "bad input" }]);
     expect(store.timeSeriesRequestStatus.status).toBe("badrequest");
@@ -267,9 +268,6 @@ describe("migrated pinia stores", () => {
     store.setRequestData({ dataset_id: "paleocar" });
     expect(store.requestData).toEqual({ dataset_id: "paleocar" });
 
-    store.setResponseError({ error: "boom" });
-    expect(store.responseError).toEqual({ error: "boom" });
-
     store.setResponse({
       summary_stats: [{ name: "Original", stdev: 2, mean: 3, median: 3 }],
       series: [
@@ -284,5 +282,10 @@ describe("migrated pinia stores", () => {
     expect(store.summaryStatistics[0].name).toBe("Original");
     expect(store.timeseries[0].x).toEqual([416, 417, 590]);
     expect(store.timeseries[0].y).toEqual([1, null, 3]);
+
+    store.clear();
+    expect(store.timeseries).toEqual([]);
+    expect(store.summaryStatistics).toEqual([]);
+    expect(store.requestData).toEqual({ dataset_id: "paleocar" });
   });
 });

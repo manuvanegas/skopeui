@@ -112,16 +112,24 @@ export function useLegacyStoreActions() {
     datasetStore.setGeoJson(geoJson);
   }
 
+  // Results for one study area must not survive a change of area: drop the
+  // plots, the statistics and the cached extractions.
+  function clearResults() {
+    datasetStore.clearJobIds();
+    datasetStore.clearTimeSeries();
+    analysisStore.clear();
+  }
+
   function clearGeoJson() {
     persistenceStorage.remove(datasetStore.geoJsonKey);
     datasetStore.clearGeoJson();
+    clearResults();
   }
 
   function saveGeoJson(geoJson: unknown) {
     persistenceStorage.set(datasetStore.geoJsonKey, geoJson);
     datasetStore.setGeoJson(geoJson);
-    datasetStore.clearJobIds();
-    datasetStore.clearTimeSeries();
+    clearResults();
 
     if (!_.isEmpty(analysisStore.requestData)) {
       analysisStore.setGeoJson(geoJson);
