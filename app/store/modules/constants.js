@@ -1,6 +1,6 @@
 import { find } from "lodash";
 import { API_HOST_URL, BUILD_ID } from "@/store/modules/_constants";
-import { toISODate } from "@/store/stats";
+import { extractYear, toISODate } from "@/store/stats";
 
 export const DEFAULT_CENTERED_SMOOTHING_WIDTH = 11;
 export const DEFAULT_MAX_PROCESSING_TIME = 20000; // in ms
@@ -117,12 +117,27 @@ export const SMOOTHING_OPTIONS = [
   },
 ];
 
-// constants data structure for available transform options to display in the UI
+function sameYears(a, b) {
+  if (a == null || b == null) return false;
+  return (
+    extractYear(a.gte) === extractYear(b.gte) &&
+    extractYear(a.lte) === extractYear(b.lte)
+  );
+}
+
+// constants data structure for available transform options to display in the UI.
+// matches(transform, timeRange) picks the option a request's transform came
+// from, given the request's own time range. Two options send
+// ZScoreFixedInterval: "selected" uses the request's range as its reference,
+// "fixed" a range the user typed.
 export const TRANSFORM_OPTIONS = [
   {
     label: "None: Modeled values displayed",
     id: "none",
     type: "NoTransform",
+    matches: function (transform) {
+      return transform.type === this.type;
+    },
     toRequestData: function () {
       return {
         type: this.type,
@@ -136,26 +151,40 @@ export const TRANSFORM_OPTIONS = [
     label: "Z-Score wrt selected interval",
     id: "zscoreSelected",
     type: "ZScoreFixedInterval",
-    toRequestData: function () {
+    matches: function (transform, timeRange) {
+      // Requests saved before the reference was sent carry none.
+      return (
+        transform.type === this.type &&
+        (transform.time_range == null ||
+          sameYears(transform.time_range, timeRange))
+      );
+    },
+    toRequestData: function (analyzeVue) {
+      // The API's reference defaults to the whole stored extraction, which
+      // need not be the range on screen, so send the range explicitly.
       return {
         type: this.type,
+        time_range: {
+          gte: toISODate(analyzeVue.temporalRange[0]),
+          lte: toISODate(analyzeVue.temporalRange[1]),
+        },
       };
     },
-    fromRequestData: function (analyzeVue, requestData) {
-      if (requestData.time_range) {
-        // FIXME: refactor this, we have two mappings for ZScoreFixedIntervals and
-        // the only way to disambiguate them at the moment is testing for requestData.time_range
-        analyzeVue.transformOption = "zscoreFixed";
-        analyzeVue.time_range = requestData.time_range;
-      } else {
-        analyzeVue.transformOption = this.id;
-      }
+    fromRequestData: function (analyzeVue) {
+      analyzeVue.transformOption = this.id;
     },
   },
   {
     label: "Z-Score wrt fixed interval",
     id: "zscoreFixed",
     type: "ZScoreFixedInterval",
+    matches: function (transform, timeRange) {
+      return (
+        transform.type === this.type &&
+        transform.time_range != null &&
+        !sameYears(transform.time_range, timeRange)
+      );
+    },
     toRequestData: function (analyzeVue) {
       return {
         type: this.type,
@@ -166,15 +195,21 @@ export const TRANSFORM_OPTIONS = [
       };
     },
     fromRequestData: function (analyzeVue, requestData) {
-      // FIXME: this does not get called due to multiple mappings for ZScoreFixedIntervals
+      // The form edits years; the request carries ISO dates or keys.
       analyzeVue.transformOption = this.id;
-      analyzeVue.time_range = requestData.time_range;
+      analyzeVue.timeRange = {
+        lb: { year: extractYear(requestData.time_range.gte), month: 1 },
+        ub: { year: extractYear(requestData.time_range.lte), month: 1 },
+      };
     },
   },
   {
     label: "Z-Score wrt moving interval",
     id: "zscoreMoving",
     type: "ZScoreMovingInterval",
+    matches: function (transform) {
+      return transform.type === this.type;
+    },
     toRequestData: function (analyzeVue) {
       return {
         type: this.type,

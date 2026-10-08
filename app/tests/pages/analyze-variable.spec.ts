@@ -169,4 +169,22 @@ describe("route /dataset/:id/analyze/:variable", () => {
     expect(analysisStore.setRequestData).toHaveBeenCalled();
     expect(legacyActions.resolveTimeSeries).toHaveBeenCalled();
   });
+
+  it("[behavior] starts the analysis once metadata arrives after mounting", async () => {
+    // A fresh page load: the page mounts before the dataset's metadata loads.
+    const metadata = datasetStore.metadata;
+    datasetStore.metadata = null;
+
+    await mountWithSuspense(AnalyzePage, { global: { stubs: layoutStubs } });
+    await flushPromises();
+    expect(analysisStore.setDefaultRequestData).not.toHaveBeenCalled();
+    expect(legacyActions.resolveTimeSeries).not.toHaveBeenCalled();
+
+    datasetStore.metadata = metadata;
+    await flushPromises();
+
+    expect(legacyActions.initializeDatasetGeoJson).toHaveBeenCalled();
+    expect(analysisStore.setDefaultRequestData).toHaveBeenCalledTimes(1);
+    expect(legacyActions.resolveTimeSeries).toHaveBeenCalledTimes(1);
+  });
 });

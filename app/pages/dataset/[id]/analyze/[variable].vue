@@ -54,7 +54,7 @@
             <!-- /////////// TRANSFORMATION OPTIONS /////////// -->
             <v-select
               v-model="transformOption"
-              :items="transformOptions"
+              :items="transformItems"
               color="secondary"
               item-color="secondary"
               item-title="label"
@@ -146,7 +146,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch } from "vue";
+import { useMounted, whenever } from "@vueuse/core";
 import { useRoute } from "vue-router";
 import { useDisplay } from "vuetify";
 import TimeSeriesPlot from "@/components/dataset/TimeSeriesPlot.vue";
@@ -207,6 +208,9 @@ const smoothingOptions = SMOOTHING_OPTIONS;
 // compatible with the analyzeVue interface expected by SMOOTHING_OPTIONS /
 // TRANSFORM_OPTIONS toRequestData / fromRequestData functions.
 const analyzeVue: any = {
+  get temporalRange() {
+    return temporalRange.value;
+  },
   get smoothingOption() {
     return smoothingOption.value;
   },
@@ -231,13 +235,6 @@ const analyzeVue: any = {
   set timeRange(v) {
     timeRange.value = v;
   },
-  // snake_case alias used in some fromRequestData implementations
-  get time_range() {
-    return timeRange.value;
-  },
-  set time_range(v) {
-    timeRange.value = v;
-  },
   get zScoreMovingIntervalTimeSteps() {
     return zScoreMovingIntervalTimeSteps.value;
   },
@@ -249,6 +246,22 @@ const analyzeVue: any = {
 const metadata = computed(() => datasetStore.metadata);
 const isLoadingMetadata = computed(() => metadata.value == null);
 const temporalRange = computed(() => datasetStore.temporalRange);
+// The "selected interval" z-score uses the range on screen as its reference,
+// so its label names that range.
+const transformItems = computed(() =>
+  transformOptions.map((option: any) => {
+    if (option.id !== "zscoreSelected") return option;
+    const [start, end] = temporalRange.value;
+    const isFullRecord =
+      start === datasetStore.minYear && end === datasetStore.maxYear;
+    return {
+      ...option,
+      label: isFullRecord
+        ? `Z-Score wrt full record (${start}–${end})`
+        : `Z-Score wrt selected interval (${start}–${end})`,
+    };
+  }),
+);
 const minYear = computed(() => datasetStore.minYear);
 const maxYear = computed(() => datasetStore.maxYear);
 const studyAreaGeoJson = computed(() => datasetStore.geoJson);
@@ -319,7 +332,7 @@ function transformHint(transform: string) {
     case "zscoreMoving":
       return "Displays Z-score transformed values relative to a moving window of a size (N time steps) selected by the user";
     case "zscoreSelected":
-      return "Displays Z-score transformed values using the selected interval";
+      return "Displays Z-score transformed values relative to the time range shown in the plot";
     default:
       return "Modeled values are graphed without any transformation";
   }
@@ -404,10 +417,10 @@ function initializeRequestData() {
   return incoming;
 }
 
-function loadTransformOption(transform: any) {
+function loadTransformOption(transform: any, timeRange: any) {
   if (!transform) return;
-  const option = transformOptions.find(
-    (x: any) => x.type === transform.type,
+  const option = transformOptions.find((x: any) =>
+    x.matches(transform, timeRange),
   ) as any;
   if (option) option.fromRequestData(analyzeVue, transform);
 }
@@ -428,7 +441,7 @@ async function initializeFormData(requestData: any) {
   if (!requestData) return;
   zonalStatistic.value = requestData.zonal_statistic ?? zonalStatistic.value;
   loadSmoothingOption(requestData.requested_series_options ?? []);
-  loadTransformOption(requestData.transform);
+  loadTransformOption(requestData.transform, requestData.time_range);
 }
 
 function clearTransformedTimeSeries() {
@@ -523,7 +536,7 @@ watch(
     if (hasTransformOption.value) {
       yAxisLabel.value =
         (
-          transformOptions.find(
+          transformItems.value.find(
             (x: any) => x.id === transformOption.value,
           ) as any
         )?.label ?? null;
@@ -547,12 +560,20 @@ await useAsyncData(
   { server: false },
 );
 
-onMounted(async () => {
-  legacyActions.initializeDatasetGeoJson();
-  analysisStore.setGeoJson(datasetStore.geoJson as any);
-  const requestData = initializeRequestData();
-  await initializeFormData(requestData);
-});
+// The first request needs the dataset's metadata, and the study area that's
+// saved under the dataset's ID. On a fresh page load the metadata arrives
+// after mounting, so start once both have happened.
+const isMounted = useMounted();
+whenever(
+  () => isMounted.value && datasetStore.metadata != null,
+  async () => {
+    legacyActions.initializeDatasetGeoJson();
+    analysisStore.setGeoJson(datasetStore.geoJson as any);
+    const requestData = initializeRequestData();
+    await initializeFormData(requestData);
+  },
+  { once: true },
+);
 </script>
 
 <style scoped>
