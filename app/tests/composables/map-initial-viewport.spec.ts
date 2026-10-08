@@ -1,42 +1,50 @@
 import { describe, expect, it } from "vitest";
 
-import { getInitialMapViewport } from "@/composables/useMapInitialViewport";
+import {
+  getInitialMapViewport,
+  leafletBounds,
+  leafletStartView,
+} from "@/composables/useMapInitialViewport";
+
+const bbox: [number, number, number, number] = [-115, 31, -102, 43];
 
 describe("getInitialMapViewport", () => {
-  it("uses region center and zoom from metadata when valid", () => {
+  it("uses the dataset's map_view when it has one", () => {
     const viewport = getInitialMapViewport({
-      region: {
-        center: [44.5, -120.2],
-        zoom: 6,
-      },
+      bbox,
+      map_view: { center: { lon: -108.5, lat: 37 }, zoom: 4 },
     });
 
-    expect(viewport).toEqual({
-      center: [44.5, -120.2],
-      zoom: 6,
-    });
+    expect(viewport).toEqual({ center: { lon: -108.5, lat: 37 }, zoom: 4 });
   });
 
-  it("falls back to defaults when metadata is missing", () => {
-    const viewport = getInitialMapViewport(null);
+  it("fits the bbox when there is no map_view", () => {
+    expect(getInitialMapViewport({ bbox, map_view: null })).toEqual({ bbox });
+  });
 
-    expect(viewport).toEqual({
-      center: [0, 0],
+  it("falls back to the whole world without a dataset", () => {
+    expect(getInitialMapViewport(null)).toEqual({
+      center: { lon: 0, lat: 0 },
       zoom: 2,
     });
   });
+});
 
-  it("falls back to defaults when region values are malformed", () => {
-    const viewport = getInitialMapViewport({
-      region: {
-        center: ["x", 10],
-        zoom: "high",
-      },
-    });
+describe("Leaflet adapters", () => {
+  it("swaps a center to Leaflet's latitude-first order", () => {
+    expect(
+      leafletStartView({ center: { lon: -108.5, lat: 37 }, zoom: 4 }),
+    ).toEqual({ center: [37, -108.5], zoom: 4 });
+  });
 
-    expect(viewport).toEqual({
-      center: [0, 0],
-      zoom: 2,
-    });
+  it("starts a bbox viewport from the default, to be fitted when ready", () => {
+    expect(leafletStartView({ bbox })).toEqual({ center: [0, 0], zoom: 2 });
+  });
+
+  it("turns a bbox into south-west and north-east corners", () => {
+    expect(leafletBounds(bbox)).toEqual([
+      [31, -115],
+      [43, -102],
+    ]);
   });
 });

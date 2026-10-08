@@ -74,7 +74,7 @@ const mocks = vi.hoisted(() => {
       layer.layout[property] = value;
     });
 
-    constructor(options: any) {
+    constructor(readonly options: any) {
       this.style = {
         version: options.style.version,
         sources: { ...options.style.sources },
@@ -171,10 +171,6 @@ vi.mock("@/stores/messages", () => ({
 
 vi.mock("@/composables/useLegacyStoreActions", () => ({
   useLegacyStoreActions: () => mocks.legacyActions,
-}));
-
-vi.mock("@/composables/useMapInitialViewport", () => ({
-  getInitialMapViewport: () => ({ zoom: 2, center: [0, 0] }),
 }));
 
 vi.mock("@/store/modules/constants", () => ({
@@ -396,5 +392,67 @@ describe("MapLibre basemap selector", () => {
 
     const source = mocks.mapInstances[0].getStyle().sources["cog-source-a"];
     expect(source.tiles[0]).toContain("colormap=viridis");
+  });
+
+  it("[behavior] opens on the dataset's map_view", async () => {
+    mocks.datasetStore.metadata = {
+      id: "paleocar",
+      variables: [],
+      bbox: [-115, 31, -102, 43],
+      map_view: { center: { lon: -108.5, lat: 37 }, zoom: 4 },
+    };
+
+    mount(MapLibre, { global: { stubs: uiStubs } });
+    await flushPromises();
+
+    const { options } = mocks.mapInstances[0];
+    expect(options.center).toEqual([-108.5, 37]);
+    expect(options.zoom).toBe(4);
+    expect(options.bounds).toBeUndefined();
+  });
+
+  it("[behavior] fits the dataset's bbox without a map_view", async () => {
+    mocks.datasetStore.metadata = {
+      id: "paleocar",
+      variables: [],
+      bbox: [-115, 31, -102, 43],
+      map_view: null,
+    };
+
+    mount(MapLibre, { global: { stubs: uiStubs } });
+    await flushPromises();
+
+    const { options } = mocks.mapInstances[0];
+    expect(options.bounds).toEqual([-115, 31, -102, 43]);
+    expect(options.center).toBeUndefined();
+  });
+
+  it("[behavior] outlines the bbox and requests tiles only inside it", async () => {
+    mocks.routeState.name = "dataset-id-visualize-variable";
+    mocks.routeState.params = { id: "paleocar", variable: "tasmax" };
+    mocks.datasetStore.metadata = {
+      id: "paleocar",
+      variables: [],
+      bbox: [-115, 31, -102, 43],
+      map_view: null,
+    };
+
+    mount(MapLibre, { global: { stubs: uiStubs } });
+    await flushPromises();
+    await nextTick();
+
+    const { sources } = mocks.mapInstances[0].getStyle();
+    expect(sources["cog-source-a"].bounds).toEqual([-115, 31, -102, 43]);
+    expect(
+      sources["dataset-region"].data.features[0].geometry.coordinates,
+    ).toEqual([
+      [
+        [-115, 31],
+        [-102, 31],
+        [-102, 43],
+        [-115, 43],
+        [-115, 31],
+      ],
+    ]);
   });
 });

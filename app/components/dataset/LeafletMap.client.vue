@@ -80,8 +80,8 @@
           ref="layerMap"
           class="leaflet-map"
           :min-zoom="2"
-          :zoom="initialMapZoom"
-          :center="initialMapCenter"
+          :zoom="initialCenter.zoom"
+          :center="initialCenter.center"
           @ready="mapReady"
         >
           <l-tile-layer
@@ -94,9 +94,8 @@
             layer-type="base"
           />
           <l-rectangle
-            v-if="metadata?.region"
-            :bounds="metadata.region.extents"
-            :style="metadata.region.style"
+            v-if="datasetBounds"
+            :bounds="datasetBounds"
             :fill-opacity="defaultDatasetOpacity"
           />
           <l-control-layers
@@ -117,7 +116,11 @@ import { useRoute } from "vue-router";
 import { LEAFLET_PROVIDERS } from "@/store/modules/constants";
 import circleToPolygon from "circle-to-polygon";
 import { useLegacyStoreActions } from "@/composables/useLegacyStoreActions";
-import { getInitialMapViewport } from "@/composables/useMapInitialViewport";
+import {
+  getInitialMapViewport,
+  leafletBounds,
+  leafletStartView,
+} from "@/composables/useMapInitialViewport";
 import { useAppStore } from "@/stores/app";
 import { useDatasetStore } from "@/stores/dataset";
 
@@ -158,10 +161,14 @@ const currentStep = computed(() =>
 );
 const showMapControls = computed(() => currentStep.value >= 1);
 const initialMapViewport = computed(() =>
-  getInitialMapViewport(metadata.value as any),
+  getInitialMapViewport(metadata.value),
 );
-const initialMapZoom = computed(() => initialMapViewport.value.zoom);
-const initialMapCenter = computed(() => initialMapViewport.value.center);
+const initialCenter = computed(() =>
+  leafletStartView(initialMapViewport.value),
+);
+const datasetBounds = computed(() =>
+  metadata.value?.bbox ? leafletBounds(metadata.value.bbox) : null,
+);
 const leafletProviders = LEAFLET_PROVIDERS;
 const isSelectArea = computed(() => currentStep.value === 1);
 const isVisualize = computed(() => currentStep.value === 2);
@@ -280,6 +287,8 @@ function registerToolbarHandlers(map: any) {
 
 function mapReady(map: any) {
   leafletMap = map;
+  const viewport = initialMapViewport.value;
+  if ("bbox" in viewport) map.fitBounds(leafletBounds(viewport.bbox));
   // Leaflet can calculate a stale size when mounted in flex/grid layouts; force recalc.
   requestAnimationFrame(() => map.invalidateSize(true));
   addDrawToolbar(map);

@@ -117,7 +117,10 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "@geoman-io/maplibre-geoman-free/dist/maplibre-geoman.css";
 import { LEAFLET_PROVIDERS, TILES_ENDPOINT } from "@/store/modules/constants";
 import { useLegacyStoreActions } from "@/composables/useLegacyStoreActions";
-import { getInitialMapViewport } from "@/composables/useMapInitialViewport";
+import {
+  getInitialMapViewport,
+  type Bbox,
+} from "@/composables/useMapInitialViewport";
 import { useAppStore } from "@/stores/app";
 import { useDatasetStore } from "@/stores/dataset";
 import { useMessagesStore } from "@/stores/messages";
@@ -143,17 +146,12 @@ const mapContainer = ref<HTMLElement | null>(null);
 const isStepLoading = ref(false);
 
 const stepNames = computed(() => appStore.stepNames);
-const metadata = computed(() => datasetStore.metadata as any);
+const metadata = computed(() => datasetStore.metadata);
 const selectedArea = computed(() => datasetStore.selectedAreaInSquareKm);
 const currentStep = computed(() =>
   stepNames.value.findIndex((x: unknown) => x === route.name),
 );
 const isSelectArea = computed(() => currentStep.value === 1);
-const initialMapViewport = computed(() =>
-  getInitialMapViewport(metadata.value),
-);
-const initialMapZoom = computed(() => initialMapViewport.value.zoom);
-const initialMapCenter = computed(() => initialMapViewport.value.center);
 
 const cogBaseUrl = computed(getCogBaseUrl);
 const legendVisible = computed(() => props.displayRaster && !!cogBaseUrl.value);
@@ -319,16 +317,9 @@ function getCogFullUrl(baseUrl, step) {
   return `${baseUrl}/${urlStep}/{z}/{x}/{y}?${params.toString()}`;
 }
 
+// Tiles are only requested inside the dataset's bbox, [west, south, east, north].
 function getCogBounds(): number[] | undefined {
-  const extents = metadata.value?.region?.extents;
-  const nw = extents?.[0];
-  const se = extents?.[1];
-  if (Array.isArray(nw) && Array.isArray(se)) {
-    const [north, west] = nw;
-    const [south, east] = se;
-    return [west, south, east, north];
-  }
-  return undefined;
+  return metadata.value?.bbox;
 }
 
 function addCogSlot(slot: typeof COG_A, step: number, opacity: number) {
@@ -415,14 +406,7 @@ function updateRasterLayer(step: number) {
   map.once("idle", pendingIdleSwap);
 }
 
-function mapExtentPolygon(extents: any): any {
-  const sw = extents?.[0];
-  const ne = extents?.[1];
-  if (!Array.isArray(sw) || !Array.isArray(ne)) {
-    return { type: "FeatureCollection", features: [] };
-  }
-  const [south, west] = sw;
-  const [north, east] = ne;
+function mapExtentPolygon([west, south, east, north]: Bbox): any {
   return {
     type: "FeatureCollection",
     features: [
@@ -643,7 +627,7 @@ function handleGmRemove() {
 }
 
 function addMetadataExtentLayer() {
-  if (!map || !isMapLoaded || !metadata.value?.region?.extents) return;
+  if (!map || !isMapLoaded || !metadata.value?.bbox) return;
 
   const sourceId = "dataset-region";
   const lineLayerId = "dataset-region-outline";
@@ -654,7 +638,7 @@ function addMetadataExtentLayer() {
 
   map.addSource(sourceId, {
     type: "geojson",
-    data: mapExtentPolygon(metadata.value.region.extents),
+    data: mapExtentPolygon(metadata.value.bbox),
   });
 
   map.addLayer({
@@ -705,12 +689,17 @@ function exportSelectedGeometry() {
 onMounted(() => {
   if (!mapContainer.value) return;
 
+  const viewport = getInitialMapViewport(metadata.value);
   map = new maplibregl.Map({
     container: mapContainer.value,
     style: baseStyle(),
-    center: [initialMapCenter.value[1], initialMapCenter.value[0]],
-    zoom: initialMapZoom.value,
     minZoom: 2,
+    ...("bbox" in viewport
+      ? { bounds: viewport.bbox, fitBoundsOptions: { padding: 20 } }
+      : {
+          center: [viewport.center.lon, viewport.center.lat],
+          zoom: viewport.zoom,
+        }),
   });
 
   map.addControl(new maplibregl.NavigationControl(), "top-right");
@@ -778,7 +767,7 @@ watch(
 );
 
 watch(
-  () => metadata.value?.region?.extents,
+  () => metadata.value?.bbox,
   () => {
     addMetadataExtentLayer();
   },

@@ -5,19 +5,17 @@
         <NuxtLink :to="absoluteUrl">
           <l-map
             :min-zoom="2"
-            :zoom="safeRegion.zoom"
-            :center="safeRegion.center"
+            :zoom="initialCenter.zoom"
+            :center="initialCenter.center"
             class="list-item-map"
+            @ready="fitToViewport"
           >
             <l-control-scale />
             <l-tile-layer
               url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"
               attribution="Tiles &copy; Esri"
             />
-            <l-rectangle
-              :bounds="safeRegion.extents"
-              :l-style="safeRegion.style"
-            />
+            <l-rectangle :bounds="leafletBounds(bbox)" />
           </l-map>
         </NuxtLink>
       </client-only>
@@ -55,7 +53,12 @@ import { computed } from "vue";
 import { BaseMapProvider } from "@/store/modules/constants";
 import MetadataModal from "@/components/dataset/MetadataModal.vue";
 import VariableList from "@/components/dataset/VariableList.vue";
-import type { OverviewLink, Time, Variable } from "@/types/metadata";
+import {
+  getInitialMapViewport,
+  leafletBounds,
+  leafletStartView,
+} from "@/composables/useMapInitialViewport";
+import type { MapView, OverviewLink, Time, Variable } from "@/types/metadata";
 import { timeCoverageLabel } from "@/utils/timeAxis";
 
 const props = defineProps<{
@@ -64,26 +67,20 @@ const props = defineProps<{
   resolution_label: string;
   time: Time;
   links: OverviewLink[];
-  region?: {
-    zoom: number;
-    center: any;
-    extents: any;
-    style?: any;
-  };
+  bbox: [number, number, number, number];
+  map_view: MapView | null;
   description: string;
   id: string;
   variables: Variable[];
 }>();
 
-const safeRegion = computed(() => ({
-  zoom: props.region?.zoom ?? 2,
-  center: props.region?.center ?? [0, 0],
-  extents: props.region?.extents ?? [
-    [-1, -1],
-    [1, 1],
-  ],
-  style: props.region?.style ?? {},
-}));
+const viewport = computed(() => getInitialMapViewport(props));
+const initialCenter = computed(() => leafletStartView(viewport.value));
+
+function fitToViewport(map: any) {
+  if ("bbox" in viewport.value)
+    map.fitBounds(leafletBounds(viewport.value.bbox));
+}
 
 const safeDescription = computed(() => props.description ?? "");
 const safeVariables = computed(() => props.variables ?? []);
