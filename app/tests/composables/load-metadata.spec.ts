@@ -83,6 +83,35 @@ describe("initializeDataset", () => {
     expect(useDatasetStore().variable.id).toBe("ppt_annual");
   });
 
+  it("doesn't wait for metadata between a loaded dataset's steps", async () => {
+    // The request can sit behind a running extraction; the next page shouldn't.
+    serve(metadataFixture);
+    const actions = useLegacyStoreActions();
+    await actions.initializeDataset("paleocar_v3");
+    let answer: (response: Response) => void = () => undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise<Response>((resolve) => (answer = resolve))),
+    );
+
+    await actions.initializeDataset("paleocar_v3");
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    answer(new Response(JSON.stringify(metadataFixture), { status: 200 }));
+  });
+
+  it("still notices a changed API between a loaded dataset's steps", async () => {
+    serve(metadataFixture);
+    const actions = useLegacyStoreActions();
+    await actions.initializeDataset("paleocar_v3");
+    serve({ ...metadataFixture, schema_version: "2.0.0" });
+
+    await actions.initializeDataset("paleocar_v3");
+    await vi.waitFor(() =>
+      expect(useMetadataStore().updateRequired).toBe(true),
+    );
+  });
+
   it("keeps the variable the URL names", async () => {
     serve(metadataFixture);
     await useLegacyStoreActions().initializeDataset(

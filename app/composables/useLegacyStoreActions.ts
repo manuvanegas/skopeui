@@ -59,7 +59,7 @@ export function useLegacyStoreActions() {
   const analysisStore = useAnalysisStore();
   const persistenceStorage = usePersistenceStorage();
 
-  // Fetched on every page load, not cached, so a UI left open across an API
+  // Fetched on every page change, not cached, so a UI left open across an API
   // deploy notices a changed schema version on its next navigation (CUT-001).
   async function loadAllDatasetMetadata() {
     const response = await requestJson(METADATA_ENDPOINT);
@@ -77,9 +77,13 @@ export function useLegacyStoreActions() {
     metadataId: string,
     variableId?: string | null,
   ) {
-    // Already loaded (moving between its steps): skip the metadata request,
-    // which waits behind a running extraction and held up the next page.
+    // Already loaded (moving between its steps): don't wait for the metadata
+    // request, which can sit behind a running extraction and held up the next
+    // page. Still send it, so a changed API is noticed (CUT-001); a version
+    // mismatch flags the update screen, and other failures can wait for the
+    // next page.
     if (metadataId === (datasetStore.metadata as any)?.id) {
+      loadAllDatasetMetadata().catch(() => undefined);
       return;
     }
 
