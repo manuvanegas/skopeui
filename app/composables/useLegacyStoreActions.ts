@@ -31,17 +31,24 @@ async function requestJson(url: string, options: RequestInit = {}) {
     const error = new Error(
       `Request failed with status ${response.status}`,
     ) as Error & {
-      response?: { status: number; data: unknown };
+      response?: { status: number; data: unknown; retryAfter?: number };
     };
     error.response = {
       status: response.status,
       data: responseData,
+      retryAfter: Number(response.headers.get("Retry-After")) || undefined,
     };
     throw error;
   }
 
   return response.json();
 }
+
+// The API runs a limited number of extractions at once and refuses more with
+// 503 and Retry-After. Keep trying for about a minute before giving up. The
+// browser can read Retry-After only if the API exposes it; otherwise 5s.
+const CAPACITY_RETRY_SECONDS = 5;
+const CAPACITY_WAIT_LIMIT_MS = 60_000;
 
 // /analyze statuses that mean the cached extraction can't be used.
 const RESUBMIT_STATUSES = [404, 409, 422];
@@ -70,11 +77,13 @@ export function useLegacyStoreActions() {
     metadataId: string,
     variableId?: string | null,
   ) {
-    await loadAllDatasetMetadata();
-
+    // Already loaded (moving between its steps): skip the metadata request,
+    // which waits behind a running extraction and held up the next page.
     if (metadataId === (datasetStore.metadata as any)?.id) {
       return;
     }
+
+    await loadAllDatasetMetadata();
 
     const datasetMetadata = metadataStore.find(metadataId);
     if (datasetMetadata == null) {
@@ -146,11 +155,23 @@ export function useLegacyStoreActions() {
   }
 
   async function submitTimeSeriesRequest(requestData: Record<string, any>) {
-    const result = await requestJson(TIMESERIES_SUBMIT_ENDPOINT, {
-      method: "POST",
-      body: JSON.stringify(requestData),
-    });
-    return result.job_id as string;
+    const deadline = Date.now() + CAPACITY_WAIT_LIMIT_MS;
+    for (;;) {
+      try {
+        const result = await requestJson(TIMESERIES_SUBMIT_ENDPOINT, {
+          method: "POST",
+          body: JSON.stringify(requestData),
+        });
+        return result.job_id as string;
+      } catch (error: any) {
+        const waitMs =
+          (error.response?.retryAfter ?? CAPACITY_RETRY_SECONDS) * 1000;
+        if (error.response?.status !== 503 || Date.now() + waitMs > deadline) {
+          throw error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, waitMs));
+      }
+    }
   }
 
   async function pollTimeSeriesStatus(jobId: string) {
@@ -234,14 +255,35 @@ export function useLegacyStoreActions() {
         );
         return { newJobId: existingJobId, response: response };
       } catch (error: any) {
-        if (!RESUBMIT_STATUSES.includes(error.response?.status)) {
+        const status = error.response?.status;
+        if (!RESUBMIT_STATUSES.includes(status)) {
           throw error;
+        }
+        // Incomplete: usually still running, started by the page just left.
+        // Wait for it; a second extraction is refused while one runs (503).
+        if (status === 409) {
+          try {
+            await pollTimeSeriesStatus(existingJobId);
+            const response = await refineTimeSeriesAnalysis(
+              existingJobId,
+              requestData,
+            );
+            return { newJobId: existingJobId, response: response };
+          } catch (pollError: any) {
+            // Only a failed extraction is worth submitting again.
+            if (pollError.response?.status !== 500) throw pollError;
+          }
         }
       }
     }
-    // No usable extraction: none yet, expired (404), incomplete (409) or
+    // No usable extraction: none yet, expired (404), failed (409) or
     // unusable (422). Clients may resubmit stale jobs (skope-api ADR 0005).
     const newJobId = await submitTimeSeriesRequest(requestData);
+    // Known from submission on, so another page can wait for this extraction
+    // instead of starting its own.
+    if (requestData.variable_id) {
+      datasetStore.setJobId(requestData.variable_id, newJobId);
+    }
     const response = await pollTimeSeriesStatus(newJobId);
     const result = response.result;
     return { newJobId, response: result };

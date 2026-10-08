@@ -79,6 +79,7 @@ const legacyActions = useLegacyStoreActions();
 
 const stepSelected = ref(1500);
 let stopTimeSeriesWatch: (() => void) | null = null;
+let isUnmounted = false;
 
 const hasValidStudyArea = computed(() => datasetStore.hasGeoJson);
 // No link while leaving the page: a link without its params makes the router
@@ -113,6 +114,8 @@ async function updateTimeSeries(data: any) {
       data,
     );
     datasetStore.setJobId(varId, newJobId);
+    // Left for another page meanwhile: its status and messages are its own.
+    if (isUnmounted) return;
     const originalSeries = response.series[0];
     const timeSeries = {
       x: originalSeries.timesteps.map(yearOfTimestep),
@@ -126,6 +129,7 @@ async function updateTimeSeries(data: any) {
     });
     datasetStore.setTimeSeriesLoaded();
   } catch (e: any) {
+    if (isUnmounted) return;
     datasetStore.clearTimeSeries();
     if (e.response) {
       const { status, data: responseData } = e.response;
@@ -195,6 +199,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  isUnmounted = true;
   stopTimeSeriesWatch?.();
 });
 </script>
