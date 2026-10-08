@@ -10,24 +10,35 @@
             icon
             size="x-small"
             rounded
+            variant="text"
+            class="ml-2"
+            aria-label="Dataset details"
             v-bind="{ ...props, ...tooltipProps }"
           >
-            <v-icon color="red-accent-4">mdi-alert</v-icon>
+            <v-icon color="primary">mdi-information-outline</v-icon>
           </v-btn>
         </template>
       </v-tooltip>
     </template>
     <v-card>
-      <v-card-title style="background-color: #6db1bf">
-        <h3 class="font-weight-light" style="color: white">
-          {{ metadata.title || "Dataset metadata" }}
+      <v-card-title
+        class="d-flex align-center"
+        style="background-color: #6db1bf"
+      >
+        <h3 class="font-weight-light text-wrap" style="color: white">
+          {{ metadata?.title ?? "Dataset metadata" }}
         </h3>
         <v-spacer />
-        <v-btn icon @click="showMetadata = false">
+        <v-btn
+          icon
+          variant="text"
+          aria-label="Close"
+          @click="showMetadata = false"
+        >
           <v-icon color="white">mdi-close</v-icon>
         </v-btn>
       </v-card-title>
-      <MetadataDetail :metadata="metadata" />
+      <MetadataDetail v-if="metadata" :metadata="metadata" />
     </v-card>
   </v-dialog>
 </template>
@@ -39,11 +50,5 @@ import { useMetadataStore } from "@/stores/metadata";
 const props = defineProps<{ metadataId: string }>();
 const showMetadata = ref(false);
 const metadataStore = useMetadataStore();
-const metadata = computed(
-  () =>
-    metadataStore.find(props.metadataId) ?? {
-      title: "Dataset metadata",
-      variables: [],
-    },
-);
+const metadata = computed(() => metadataStore.find(props.metadataId));
 </script>
