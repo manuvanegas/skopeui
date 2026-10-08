@@ -137,6 +137,33 @@ describe("route /dataset/:id/visualize/:variable", () => {
     );
   });
 
+  it("[behavior] drops the analyze link instead of throwing while leaving", async () => {
+    // Mid-navigation the route can lack the variable; a link built from it
+    // made the router throw during render.
+    const wrapper = await mountWithSuspense(VisualizePage, {
+      global: { stubs: layoutStubs },
+    });
+    await flushPromises();
+    const analyze = () =>
+      wrapper.findAll("button").find((b) => b.text().includes("Analyze Data"))!;
+    expect(analyze().attributes("data-to")).toBeDefined();
+
+    const variable = routeParams.variable;
+    delete (routeParams as any).variable;
+    try {
+      const fresh = await mountWithSuspense(VisualizePage, {
+        global: { stubs: layoutStubs },
+      });
+      await flushPromises();
+      const link = fresh
+        .findAll("button")
+        .find((b) => b.text().includes("Analyze Data"))!;
+      expect(link.attributes("data-to")).toBeUndefined();
+    } finally {
+      routeParams.variable = variable;
+    }
+  });
+
   it("[behavior] loads time-series data on mount", async () => {
     await mountWithSuspense(VisualizePage, { global: { stubs: layoutStubs } });
 

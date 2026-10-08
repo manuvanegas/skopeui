@@ -68,6 +68,23 @@ describe("migrated pinia stores", () => {
     expect(store.messages).toEqual([]);
   });
 
+  it("dataset store stops time-series requests once the metadata is cleared", () => {
+    // The landing page clears the metadata while visualize is still on screen;
+    // a request then went out without a dataset and came back 422.
+    const store = useDatasetStore();
+    store.setMetadata(metadataFixture.datasets[0] as Dataset);
+    store.setVariable("ppt_annual");
+    store.setGeoJson({
+      type: "Feature",
+      properties: {},
+      geometry: { type: "Point", coordinates: [-108.5, 37] },
+    });
+    expect(store.canHandleTimeSeriesRequest).toBe(true);
+
+    store.setMetadata(null);
+    expect(store.canHandleTimeSeriesRequest).toBe(false);
+  });
+
   it("dataset store updates variable, temporal range, metadata, and geojson", () => {
     const store = useDatasetStore();
 

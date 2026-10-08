@@ -127,6 +127,10 @@ export const useDatasetStore = defineStore("dataset", {
     },
     setMetadata(metadata: Dataset | null) {
       this.metadata = metadata;
+      // Without metadata there's no dataset to extract from. The landing page
+      // clears it while the page being left can still send a request.
+      this.canHandleTimeSeriesRequest =
+        !!metadata && this.hasGeoJson && !!this.variable?.id;
       if (metadata?.time) {
         [this.minYear, this.maxYear] = timeSpan(metadata.time);
         this.temporalRange = [this.minYear, this.maxYear];

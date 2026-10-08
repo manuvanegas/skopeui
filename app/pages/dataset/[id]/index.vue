@@ -82,9 +82,11 @@ const confirmGeometry = computed({
     shouldConfirmGeometry.value = value;
   },
 });
+// No link without both params: the router throws mid-render otherwise.
 const visualizeLocation = computed(() => {
   const id = route.params.id;
   const variable = (datasetStore.variable as any)?.id;
+  if (!id || !variable) return undefined;
   return { name: "dataset-id-visualize-variable", params: { id, variable } };
 });
 

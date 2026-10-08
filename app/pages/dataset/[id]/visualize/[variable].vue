@@ -81,10 +81,13 @@ const stepSelected = ref(1500);
 let stopTimeSeriesWatch: (() => void) | null = null;
 
 const hasValidStudyArea = computed(() => datasetStore.hasGeoJson);
-const analyzeLocation = computed(() => ({
-  name: "dataset-id-analyze-variable",
-  params: { id: route.params.id, variable: route.params.variable },
-}));
+// No link while leaving the page: a link without its params makes the router
+// throw mid-render, which left every page blank.
+const analyzeLocation = computed(() => {
+  const { id, variable } = route.params;
+  if (!id || !variable) return undefined;
+  return { name: "dataset-id-analyze-variable", params: { id, variable } };
+});
 const isLoadingMetadata = computed(() => datasetStore.metadata == null);
 const traces = computed(() => {
   const ts = datasetStore.timeseriesTrace;
