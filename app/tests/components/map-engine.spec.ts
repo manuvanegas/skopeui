@@ -14,9 +14,13 @@ vi.mock("@/components/dataset/MapLibre.client.vue", () => ({
 
 function engine() {
   const wrapper = mount(Map);
-  return wrapper.find('[data-test="leaflet"]').exists()
-    ? "leaflet"
-    : "maplibre";
+  if (wrapper.find('[data-test="leaflet"]').exists()) return "leaflet";
+  if (wrapper.find('[data-test="maplibre"]').exists()) return "maplibre";
+  return "none";
+}
+
+function configure(mapEngine: string) {
+  vi.stubGlobal("useRuntimeConfig", () => ({ public: { mapEngine } }));
 }
 
 describe("Map engine", () => {
@@ -25,17 +29,13 @@ describe("Map engine", () => {
     vi.unstubAllGlobals();
   });
 
-  it("uses the configured engine", () => {
-    vi.stubGlobal("useRuntimeConfig", () => ({
-      public: { mapEngine: "maplibre" },
-    }));
-    expect(engine()).toBe("maplibre");
+  it.each(["maplibre", "leaflet"])("uses the configured engine: %s", (name) => {
+    configure(name);
+    expect(engine()).toBe(name);
   });
 
   it("lets ?map_engine=leaflet pick Leaflet", () => {
-    vi.stubGlobal("useRuntimeConfig", () => ({
-      public: { mapEngine: "maplibre" },
-    }));
+    configure("maplibre");
     route.query = { map_engine: "leaflet" };
     expect(engine()).toBe("leaflet");
   });

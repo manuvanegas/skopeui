@@ -105,14 +105,6 @@ describe("route /dataset/:id/visualize/:variable", () => {
         }),
       ),
     };
-
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => timeSeriesResponseFixture,
-      })),
-    );
   });
 
   afterEach(() => {

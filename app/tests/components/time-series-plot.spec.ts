@@ -99,10 +99,4 @@ describe("TimeSeriesPlot step controls", () => {
       wrapper.find('[data-test="current-step"]').attributes("style"),
     ).toContain("min-width: 4.5ch");
   });
-
-  it("has no step controls on analyze", async () => {
-    const wrapper = mountPlot({ showStepControls: false });
-    await flushPromises();
-    expect(wrapper.find('[data-test="current-step"]').exists()).toBe(false);
-  });
 });

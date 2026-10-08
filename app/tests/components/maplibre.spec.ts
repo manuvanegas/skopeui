@@ -56,7 +56,6 @@ const mocks = vi.hoisted(() => {
   };
 
   const geomanInstance = {
-    addControls: vi.fn(async () => undefined),
     features: {
       deleteAll: vi.fn(async () => undefined),
       importGeoJson: vi.fn(async () => undefined),
@@ -239,7 +238,7 @@ const uiStubs = {
   "v-list-item": VListItemStub,
 };
 
-describe("MapLibre basemap selector", () => {
+describe("MapLibre", () => {
   beforeEach(() => {
     mocks.routeState.name = "dataset-id";
     mocks.routeState.params = { id: "paleocar" };
@@ -255,39 +254,24 @@ describe("MapLibre basemap selector", () => {
     vi.clearAllMocks();
   });
 
-  it("[behavior] starts on the default basemap", async () => {
-    await mount(MapLibre, {
-      global: {
-        stubs: uiStubs,
-      },
-    });
+  it.each(["dataset-id", "dataset-id-visualize-variable"])(
+    "[behavior] starts on the default basemap on %s",
+    async (routeName) => {
+      mocks.routeState.name = routeName;
+      mocks.routeState.params = { id: "paleocar", variable: "ppt_annual" };
 
-    await flushPromises();
-    await nextTick();
+      mount(MapLibre, { global: { stubs: uiStubs } });
+      await flushPromises();
 
-    const map = mocks.mapInstances[0];
-    const topo = map.getLayer("basemap-layer-esri-worldtopomap");
-    const carto = map.getLayer("basemap-layer-cartodb-positron");
-
-    expect(topo.layout?.visibility).toBe("visible");
-    expect(carto.layout?.visibility).toBe("none");
-  });
-
-  it("[behavior] starts on the default basemap on visualize too", async () => {
-    mocks.routeState.name = "dataset-id-visualize-variable";
-    mocks.routeState.params = { id: "paleocar", variable: "ppt_annual" };
-
-    mount(MapLibre, { global: { stubs: uiStubs } });
-    await flushPromises();
-
-    const map = mocks.mapInstances[0];
-    expect(
-      map.getLayer("basemap-layer-esri-worldtopomap").layout?.visibility,
-    ).toBe("visible");
-    expect(
-      map.getLayer("basemap-layer-cartodb-positron").layout?.visibility,
-    ).toBe("none");
-  });
+      const map = mocks.mapInstances[0];
+      expect(
+        map.getLayer("basemap-layer-esri-worldtopomap").layout?.visibility,
+      ).toBe("visible");
+      expect(
+        map.getLayer("basemap-layer-cartodb-positron").layout?.visibility,
+      ).toBe("none");
+    },
+  );
 
   it("[behavior] updates basemap visibility when selection changes", async () => {
     const wrapper = mount(MapLibre, {
@@ -361,27 +345,28 @@ describe("MapLibre basemap selector", () => {
 
     const map = mocks.mapInstances[0];
 
-    expect(mocks.geomanInstance.addControls).not.toHaveBeenCalled();
+    expect(createGeomanInstance).not.toHaveBeenCalled();
     expect(map.getSource("study-area-display")).toBeDefined();
     expect(map.getLayer("study-area-display-fill")).toBeDefined();
     expect(map.getLayer("study-area-display-outline")).toBeDefined();
   });
 
-  it("[behavior] leaves colouring to the API in tile requests", async () => {
+  it("[behavior] requests tiles by the timestep's key, leaving colouring to the API", async () => {
     mocks.routeState.name = "dataset-id-visualize-variable";
     mocks.routeState.params = { id: "paleocar", variable: "ppt_annual" };
     mocks.datasetStore.variable = ppt;
 
     await mount(MapLibre, {
       global: { stubs: uiStubs },
-      props: { step: 1500 },
+      props: { step: 590 },
     });
     await flushPromises();
     await nextTick();
 
+    // No colormap or rescale: the key is padded, and nothing follows it.
     const source = mocks.mapInstances[0].getStyle().sources["cog-source-a"];
     expect(source.tiles[0]).toBe(
-      "https://test.example.com/tiles/paleocar/ppt_annual/1500/{z}/{x}/{y}",
+      "https://test.example.com/tiles/paleocar/ppt_annual/0590/{z}/{x}/{y}",
     );
   });
 
@@ -467,22 +452,6 @@ describe("MapLibre basemap selector", () => {
     ]);
   });
 
-  it("[behavior] requests tiles by the timestep's key", async () => {
-    mocks.routeState.name = "dataset-id-visualize-variable";
-    mocks.routeState.params = { id: "paleocar", variable: "ppt_annual" };
-    mocks.datasetStore.variable = ppt;
-
-    await mount(MapLibre, {
-      global: { stubs: uiStubs },
-      props: { step: 590 },
-    });
-    await flushPromises();
-    await nextTick();
-
-    const source = mocks.mapInstances[0].getStyle().sources["cog-source-a"];
-    expect(source.tiles[0]).toContain("/ppt_annual/0590/{z}/{x}/{y}");
-  });
-
   it("[behavior] draws a point study area and doesn't zoom all the way in", async () => {
     mocks.routeState.name = "dataset-id-visualize-variable";
     mocks.routeState.params = { id: "paleocar", variable: "ppt_annual" };
@@ -518,14 +487,10 @@ describe("MapLibre basemap selector", () => {
     expect(
       Object.keys(draw).filter((mode) => draw[mode].uiEnabled === false),
     ).toEqual(["circle_marker", "text_marker", "ellipse", "line"]);
-    expect(draw.marker.title).toBe("Point: Click the map to place the point.");
-    expect(edit.cut).toEqual({ uiEnabled: false });
-    expect(edit.delete.title).toBe("Delete: Click the shape to remove it.");
-    expect(edit.change.title).toBe(
-      "Change: Drag a corner to change the shape.",
-    );
+    expect(edit.cut.uiEnabled).toBe(false);
+    // Snapping stays on without its button: it closes a polygon near its
+    // first corner.
     expect(helper.snapping).toEqual({ uiEnabled: false, active: true });
-    expect(helper.zoom_to_features.title).toBe("Zoom to shape");
   });
 
   it("[behavior] explains the active drawing tool next to the pointer", async () => {

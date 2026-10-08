@@ -94,28 +94,15 @@ describe("route /dataset/:id", () => {
     resetNuxtTestGlobals();
   });
 
-  it("[smoke] renders map once metadata is available", async () => {
+  it("[smoke] loads the dataset and shows the selection map without tiles", async () => {
     const wrapper = await mountWithSuspense(DatasetIdPage, {
       global: { stubs: layoutStubs },
     });
 
     await flushPromises();
-    const page = wrapper.findComponent(DatasetIdPage);
+    const map = wrapper.findComponent(DatasetIdPage).find('[data-test="map"]');
 
-    expect(page.findComponent({ name: "MapStub" }).exists()).toBe(true);
     expect(legacyActions.initializeDataset).toHaveBeenCalledWith("paleocar");
-  });
-
-  it("[behavior] configures selection map in non-raster mode", async () => {
-    const wrapper = await mountWithSuspense(DatasetIdPage, {
-      global: { stubs: layoutStubs },
-    });
-
-    await flushPromises();
-    const page = wrapper.findComponent(DatasetIdPage);
-    const map = page.find('[data-test="map"]');
-
-    expect(map.exists()).toBe(true);
     expect(map.attributes("data-display-raster")).toBe("false");
   });
 

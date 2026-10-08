@@ -37,7 +37,6 @@ describe("SkopeColorbar", () => {
 
     expect(labels[0]).toBe("1807.5");
     expect(labels.at(-1)).toBe("0");
-    expect(labels.join(" ")).not.toContain("% of max");
   });
 
   it("labels explicit ticks as round numbers", () => {

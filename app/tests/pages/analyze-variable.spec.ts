@@ -92,6 +92,9 @@ const layoutStubs = {
   "v-icon": { template: "<i><slot /></i>" },
   "v-btn": {
     props: ["to"],
+    // Declared, so a click runs the page's handler once, not also as a
+    // native listener.
+    emits: ["click"],
     template:
       '<button data-test="action-btn" :data-to="to && JSON.stringify(to)" @click="$emit(\'click\')"><slot /></button>',
   },
@@ -122,14 +125,6 @@ describe("route /dataset/:id/analyze/:variable", () => {
         }),
       ),
     };
-
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => timeSeriesResponseFixture,
-      })),
-    );
   });
 
   afterEach(() => {
@@ -158,6 +153,8 @@ describe("route /dataset/:id/analyze/:variable", () => {
     const page = wrapper.findComponent(AnalyzePage);
 
     await flushPromises();
+    // The first analysis runs on mount; Update must run another.
+    expect(legacyActions.resolveTimeSeries).toHaveBeenCalledTimes(1);
 
     const updateButton = page
       .findAll('[data-test="action-btn"]')
@@ -167,8 +164,17 @@ describe("route /dataset/:id/analyze/:variable", () => {
     await updateButton!.trigger("click");
     await flushPromises();
 
-    expect(analysisStore.setRequestData).toHaveBeenCalled();
-    expect(legacyActions.resolveTimeSeries).toHaveBeenCalled();
+    expect(analysisStore.setRequestData).toHaveBeenCalledTimes(1);
+    const [request] = analysisStore.setRequestData.mock.calls[0];
+    expect(request).toMatchObject({
+      zonal_statistic: "mean",
+      time_range: { gte: "0001-01-01", lte: "0003-01-01" },
+    });
+    expect(legacyActions.resolveTimeSeries).toHaveBeenCalledTimes(2);
+    expect(legacyActions.resolveTimeSeries).toHaveBeenLastCalledWith(
+      "test-job-id",
+      request,
+    );
   });
 
   it("[behavior] starts the analysis once metadata arrives after mounting", async () => {
