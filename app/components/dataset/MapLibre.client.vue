@@ -35,6 +35,7 @@
           size="small"
           color="secondary"
           variant="flat"
+          :disabled="!datasetStore.geoJson"
           prepend-icon="mdi-download"
           class="mx-2 my-auto"
           @click="exportSelectedGeometry"

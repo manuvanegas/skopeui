@@ -595,6 +595,25 @@ describe("MapLibre basemap selector", () => {
     expect(callout().exists()).toBe(true);
   });
 
+  it("[behavior] offers the GeoJSON download only once there's a shape", async () => {
+    const downloadDisabled = async () => {
+      const wrapper = mount(MapLibre, { global: { stubs: uiStubs } });
+      await flushPromises();
+      return wrapper
+        .findAll("button")
+        .find((b) => b.text() === "Download GeoJSON")!
+        .attributes("disabled");
+    };
+    expect(await downloadDisabled()).toBeDefined();
+
+    mocks.datasetStore.geoJson = {
+      type: "Feature",
+      properties: {},
+      geometry: { type: "Point", coordinates: [-108.5, 37] },
+    } as any;
+    expect(await downloadDisabled()).toBeUndefined();
+  });
+
   it("[behavior] zooms to a point shape without zooming all the way in", async () => {
     vi.useFakeTimers();
     mocks.datasetStore.geoJson = {

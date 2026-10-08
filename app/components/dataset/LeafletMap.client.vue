@@ -49,6 +49,7 @@
               size="small"
               color="secondary"
               variant="flat"
+              :disabled="!datasetStore.geoJson"
               v-bind="props"
               class="mx-2 my-auto"
               @click="exportSelectedGeometry"
