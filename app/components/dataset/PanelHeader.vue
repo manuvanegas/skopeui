@@ -17,9 +17,10 @@
   justify-content: space-between;
   gap: 8px 12px;
   /* Border-box: 64px with the border, whether it holds the readout or the
-     40px range fields, leaving room above the fields' floating labels. */
+     40px range fields, leaving room above the fields' floating labels. The
+     padding keeps wrapped rows off the edges. */
   min-height: 64px;
-  padding: 4px 16px;
+  padding: 8px 16px;
   border-bottom: thin solid rgba(var(--v-border-color), var(--v-border-opacity));
 }
 </style>

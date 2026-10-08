@@ -547,7 +547,8 @@ describe("MapLibre basemap selector", () => {
       "Click the center, then click again to set the radius.",
     );
     expect(cursorHint().attributes("style")).toContain("left: 120px");
-    expect(callout().exists()).toBe(false);
+    // The header's callout stays while a tool is active.
+    expect(callout().text()).toMatch(/Choose a shape/);
 
     const [left] = handlers.mouseout;
     left();
@@ -581,7 +582,7 @@ describe("MapLibre basemap selector", () => {
     changeToggled({ enabled: true });
     await nextTick();
     expect(cursorHint().text()).toBe("Drag a corner to change the shape.");
-    expect(callout().exists()).toBe(false);
+    expect(callout().text()).toMatch(/Draw a new shape to replace this one/);
 
     // Switching tools may report the new one before the old one ends.
     rotateToggled({ enabled: true });

@@ -9,47 +9,44 @@
     <PanelHeader>
       <!-- No readout while selecting: the API measures the area on extraction. -->
       <AreaReadout v-if="!isSelectArea" />
-      <v-spacer />
-      <input
-        v-if="isSelectArea"
-        id="loadGeoJsonFile"
-        type="file"
-        accept=".geojson"
-        style="display: none"
-        @change="loadGeoJson"
-      >
-      <v-btn
-        v-if="isSelectArea"
-        size="small"
-        color="secondary"
-        variant="outlined"
-        prepend-icon="mdi-upload"
-        @click="selectGeoJsonFile"
-      >
-        Upload GeoJSON
-      </v-btn>
-      <v-btn
-        v-if="isSelectArea"
-        size="small"
-        color="secondary"
-        variant="flat"
-        :disabled="!datasetStore.geoJson"
-        prepend-icon="mdi-download"
-        @click="exportSelectedGeometry"
-      >
-        <a id="exportSelectedGeometry">Download GeoJSON</a>
-      </v-btn>
+      <!-- What to do next. Stays put while a tool is active; that tool's own
+           instruction follows the pointer. -->
+      <div v-if="isSelectArea" class="draw-callout" data-test="draw-callout">
+        {{ datasetStore.geoJson ? EDIT_CALLOUT : DRAW_CALLOUT }}
+      </div>
+      <!-- One group, so on a narrow screen both buttons wrap together. -->
+      <div v-if="isSelectArea" class="geojson-actions">
+        <input
+          id="loadGeoJsonFile"
+          type="file"
+          accept=".geojson"
+          style="display: none"
+          @change="loadGeoJson"
+        >
+        <v-btn
+          size="small"
+          color="secondary"
+          variant="outlined"
+          prepend-icon="mdi-upload"
+          @click="selectGeoJsonFile"
+        >
+          Upload GeoJSON
+        </v-btn>
+        <v-btn
+          size="small"
+          color="secondary"
+          variant="flat"
+          :disabled="!datasetStore.geoJson"
+          prepend-icon="mdi-download"
+          @click="exportSelectedGeometry"
+        >
+          <a id="exportSelectedGeometry">Download GeoJSON</a>
+        </v-btn>
+      </div>
     </PanelHeader>
     <v-card-text class="map">
       <div class="map-frame">
         <div ref="mapContainer" class="maplibre-map" />
-        <div
-          v-if="isSelectArea && !activeTool"
-          class="draw-callout"
-          data-test="draw-callout"
-        >
-          {{ datasetStore.geoJson ? EDIT_CALLOUT : DRAW_CALLOUT }}
-        </div>
         <div
           v-if="cursorHint && drawPointer"
           class="draw-cursor-hint"
@@ -248,7 +245,7 @@ const EDIT_INSTRUCTIONS: Record<string, string> = {
   delete: "Click the shape to remove it.",
 };
 const TOOL_INSTRUCTIONS = { ...DRAW_INSTRUCTIONS, ...EDIT_INSTRUCTIONS };
-// Shown next to the draw toolbar while no tool is active.
+// Shown in the map's header on select area.
 const DRAW_CALLOUT =
   "Choose a shape to draw your study area, or upload a GeoJSON file.";
 const EDIT_CALLOUT =
@@ -963,19 +960,21 @@ onUnmounted(() => {
 }
 
 .draw-callout {
-  position: absolute;
-  top: 10px;
-  /* Just right of geoman's draw toolbar. */
-  left: 52px;
-  z-index: 5;
-  max-width: 280px;
+  flex: 0 1 auto;
+  min-width: 0;
   padding: 6px 10px;
   border-radius: 4px;
   background: #fff;
   box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
   font-size: 13px;
   line-height: 1.4;
-  pointer-events: none;
+}
+
+/* Right-aligned, on its own line too when the header wraps. */
+.geojson-actions {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
 }
 
 :deep(.maplibregl-ctrl-group) {
