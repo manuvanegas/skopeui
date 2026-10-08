@@ -186,5 +186,9 @@ describe("route /dataset/:id/analyze/:variable", () => {
     expect(legacyActions.initializeDatasetGeoJson).toHaveBeenCalled();
     expect(analysisStore.setDefaultRequestData).toHaveBeenCalledTimes(1);
     expect(legacyActions.resolveTimeSeries).toHaveBeenCalledTimes(1);
+    expect(datasetStore.setAreaSummary).toHaveBeenCalledWith(
+      timeSeriesResponseFixture.n_cells,
+      timeSeriesResponseFixture.area,
+    );
   });
 });

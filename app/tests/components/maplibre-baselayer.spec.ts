@@ -43,7 +43,8 @@ const mocks = vi.hoisted(() => {
     },
     variable: null,
     temporalRangeMax: 2000,
-    selectedAreaInSquareKm: "0.00",
+    numberOfCells: 0,
+    areaInSquareKm: 0,
     geoJson: null,
   } as any;
 
@@ -489,5 +490,31 @@ describe("MapLibre basemap selector", () => {
 
     const source = mocks.mapInstances[0].getStyle().sources["cog-source-a"];
     expect(source.tiles[0]).toContain("/ppt_annual/0590/{z}/{x}/{y}");
+  });
+
+  it("[behavior] draws a point study area and doesn't zoom all the way in", async () => {
+    mocks.routeState.name = "dataset-id-visualize-variable";
+    mocks.routeState.params = { id: "paleocar", variable: "ppt_annual" };
+    mocks.datasetStore.geoJson = {
+      type: "Feature",
+      properties: {},
+      geometry: { type: "Point", coordinates: [-108.5, 37] },
+    };
+
+    mount(MapLibre, { global: { stubs: uiStubs } });
+    await flushPromises();
+    await nextTick();
+
+    const map = mocks.mapInstances[0];
+    const point = map.getLayer("study-area-display-point");
+    expect(point.type).toBe("circle");
+    expect(point.filter).toEqual(["==", ["geometry-type"], "Point"]);
+    expect(map.fitBounds).toHaveBeenCalledWith(
+      [
+        [-108.5, 37],
+        [-108.5, 37],
+      ],
+      expect.objectContaining({ maxZoom: 10 }),
+    );
   });
 });

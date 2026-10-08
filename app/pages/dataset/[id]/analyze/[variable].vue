@@ -371,6 +371,7 @@ async function retrieveAnalysis(data: any) {
     );
     datasetStore.setJobId(varId, newJobId);
     analysisStore.setResponse(response);
+    datasetStore.setAreaSummary(response.n_cells, response.area);
     datasetStore.setTimeSeriesLoaded();
   } catch (e: any) {
     if (e.response) {

@@ -18,7 +18,7 @@ function withResults() {
   dataset.setTimeSeries({
     timeSeries: { x: [103], y: [1] },
     numberOfCells: 1,
-    totalCellArea: 0,
+    area: 0,
   });
   dataset.setTimeSeriesLoaded();
   analysis.setResponse({

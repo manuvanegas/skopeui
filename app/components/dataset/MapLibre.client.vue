@@ -8,17 +8,8 @@
   >
     <v-toolbar variant="flat" class="ma-0 pa-0">
       <v-row class="mx-0" align="baseline">
-        <v-tooltip location="bottom" text="Area of the selected geometry">
-          <template #activator="{ props }">
-            <h3
-              class="font-weight-light text-center pa-2 my-auto"
-              style="background-color: #e4e7ef"
-              v-bind="props"
-            >
-              {{ selectedArea }} km<sup>2</sup>
-            </h3>
-          </template>
-        </v-tooltip>
+        <!-- No readout while selecting: the API measures the area on extraction. -->
+        <AreaReadout v-if="!isSelectArea" class="my-auto" />
         <v-spacer />
         <v-alert
           v-if="isSelectArea"
@@ -108,6 +99,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import maplibregl from "maplibre-gl";
+import AreaReadout from "@/components/dataset/AreaReadout.vue";
 import { SkopeColorbar, type ColorbarOptions } from "@/utils/SkopeColorbar";
 import { timestepKey } from "@/utils/timeAxis";
 import type { Geoman } from "@geoman-io/maplibre-geoman-free";
@@ -150,7 +142,6 @@ const isStepLoading = ref(false);
 
 const stepNames = computed(() => appStore.stepNames);
 const metadata = computed(() => datasetStore.metadata);
-const selectedArea = computed(() => datasetStore.selectedAreaInSquareKm);
 const currentStep = computed(() =>
   stepNames.value.findIndex((x: unknown) => x === route.name),
 );
@@ -247,6 +238,10 @@ const FILL_LAYER_ID = "dataset-region-fill";
 const STUDY_AREA_SOURCE_ID = "study-area-display";
 const STUDY_AREA_FILL_LAYER_ID = "study-area-display-fill";
 const STUDY_AREA_LINE_LAYER_ID = "study-area-display-outline";
+const STUDY_AREA_POINT_LAYER_ID = "study-area-display-point";
+// Fitting a point's zero-size bbox would zoom all the way in; at zoom 10 one of
+// paleocar_v3's 30" cells is a few pixels across.
+const MAX_FIT_ZOOM = 10;
 
 function emptyFeatureCollection() {
   return { type: "FeatureCollection", features: [] as any[] };
@@ -491,7 +486,7 @@ function fitToGeoJson(geoJson: any) {
         [minX, minY],
         [maxX, maxY],
       ],
-      { padding: 30, duration: 0 },
+      { padding: 30, duration: 0, maxZoom: MAX_FIT_ZOOM },
     );
   } catch {
     // Ignore invalid geometries during exploratory migration.
@@ -531,6 +526,22 @@ function ensureStudyAreaDisplayLayer() {
       },
     });
   }
+
+  // Fill and line layers draw nothing for a point, so it needs its own.
+  if (!map.getLayer(STUDY_AREA_POINT_LAYER_ID)) {
+    map.addLayer({
+      id: STUDY_AREA_POINT_LAYER_ID,
+      type: "circle",
+      source: STUDY_AREA_SOURCE_ID,
+      filter: ["==", ["geometry-type"], "Point"],
+      paint: {
+        "circle-radius": 6,
+        "circle-color": "#facc15",
+        "circle-stroke-color": "#111827",
+        "circle-stroke-width": 2,
+      },
+    });
+  }
 }
 
 function bringStudyAreaDisplayToFront() {
@@ -547,6 +558,9 @@ function bringStudyAreaDisplayToFront() {
 
   map.moveLayer(STUDY_AREA_FILL_LAYER_ID);
   map.moveLayer(STUDY_AREA_LINE_LAYER_ID);
+  if (map.getLayer(STUDY_AREA_POINT_LAYER_ID)) {
+    map.moveLayer(STUDY_AREA_POINT_LAYER_ID);
+  }
 }
 
 function updateStudyAreaDisplay(geoJson: any) {

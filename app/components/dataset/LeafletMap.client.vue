@@ -8,18 +8,6 @@
   >
     <v-toolbar variant="flat" class="ma-0 pa-0">
       <v-row class="mx-0" align="baseline">
-        <!-- selected area -->
-        <v-tooltip location="bottom" text="Area of the selected geometry">
-          <template #activator="{ props }">
-            <h3
-              class="font-weight-light text-center pa-2 my-auto"
-              style="background-color: #e4e7ef"
-              v-bind="props"
-            >
-              {{ selectedArea }} km<sup>2</sup>
-            </h3>
-          </template>
-        </v-tooltip>
         <v-spacer />
         <v-alert
           v-if="isSelectArea"
@@ -155,7 +143,6 @@ let stopGeoJsonWatch: (() => void) | null = null;
 // Computeds
 const stepNames = computed(() => appStore.stepNames);
 const metadata = computed(() => datasetStore.metadata);
-const selectedArea = computed(() => datasetStore.selectedAreaInSquareKm);
 const currentStep = computed(() =>
   stepNames.value.findIndex((x: unknown) => x === route.name),
 );

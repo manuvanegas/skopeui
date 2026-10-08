@@ -101,11 +101,9 @@ describe("migrated pinia stores", () => {
         ],
       },
     });
-    expect(Number(store.selectedAreaInSquareKm)).toBeGreaterThan(0);
 
     store.setGeoJson(null);
     expect(store.hasGeoJson).toBe(false);
-    expect(store.selectedAreaInSquareKm).toBe("0.00");
   });
 
   it("dataset store legacy parity methods update status and derived fields", () => {
@@ -130,10 +128,10 @@ describe("migrated pinia stores", () => {
     store.setTimeSeries({
       timeSeries: { x: [1, 2, 3], y: [1, 2, 3], options: { name: "Original" } },
       numberOfCells: 2,
-      totalCellArea: 2000000,
+      area: 2000000,
     });
     expect(store.numberOfCells).toBe(2);
-    expect(store.totalCellAreaInSquareKm).toBe("2.00");
+    expect(store.areaInSquareKm).toBe(2);
 
     store.setTimeSeriesLoaded();
     expect(store.timeSeriesRequestStatus.status).toBe("success");
@@ -168,7 +166,7 @@ describe("migrated pinia stores", () => {
         options: { name: "Original" },
       },
       numberOfCells: 2,
-      totalCellArea: 2000000,
+      area: 2000000,
     });
 
     expect(store.filteredTimeSeries()).toEqual({
@@ -191,7 +189,7 @@ describe("migrated pinia stores", () => {
         options: { name: "Original" },
       },
       numberOfCells: 2,
-      totalCellArea: 2000000,
+      area: 2000000,
     });
 
     expect(store.filteredTimeSeries()).toEqual({

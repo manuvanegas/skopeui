@@ -6,29 +6,7 @@
           v-if="showArea"
           class="time-series-toolbar__group time-series-toolbar__group--metrics"
         >
-          <v-tooltip location="top" text="Selected area in square kilometers">
-            <template #activator="{ props }">
-              <h3
-                v-bind="props"
-                class="font-weight-light text-center pa-2 time-series-metric"
-              >
-                {{ selectedAreaInSquareKm }} km<sup>2</sup>
-              </h3>
-            </template>
-          </v-tooltip>
-          <v-tooltip
-            location="top"
-            text="Total cell area used in this time series calculation"
-          >
-            <template #activator="{ props }">
-              <h3
-                v-bind="props"
-                class="font-weight-light text-center pa-2 time-series-metric"
-              >
-                {{ totalCellArea }} km<sup>2</sup> ({{ numberOfCells }} cells)
-              </h3>
-            </template>
-          </v-tooltip>
+          <AreaReadout />
         </div>
 
         <v-form
@@ -128,7 +106,6 @@
         </div>
 
         <div
-          v-if="showArea"
           class="time-series-toolbar__group time-series-toolbar__group--actions"
         >
           <v-tooltip location="top" text="Return to Select Area">
@@ -204,12 +181,14 @@ import {
 } from "vue";
 import _ from "lodash";
 import { useRoute } from "vue-router";
+import AreaReadout from "@/components/dataset/AreaReadout.vue";
 import { useDatasetStore } from "@/stores/dataset";
 import { axisYears, stepAlongAxis } from "@/utils/timeAxis";
 
 const props = defineProps<{
   stepSelected?: number | null;
   showStepControls?: boolean;
+  /** Show the API's area and cell count (analyze; visualize shows it on the map). */
   showArea?: boolean;
   traces?: any[];
   yAxisLabel?: string | null;
@@ -280,17 +259,12 @@ const temporalRangeMax = computed(() => datasetStore.temporalRangeMax);
 const timeSeriesRequestStatus = computed(
   () => datasetStore.timeSeriesRequestStatus,
 );
-const selectedAreaInSquareKm = computed(
-  () => datasetStore.selectedAreaInSquareKm,
-);
 const axis = computed(() =>
   datasetStore.metadata ? axisYears(datasetStore.metadata.time) : [],
 );
 const minStep = computed(() => datasetStore.minYear);
 const maxStep = computed(() => datasetStore.maxYear);
 const variable = computed(() => datasetStore.variable as any);
-const totalCellArea = computed(() => datasetStore.totalCellAreaInSquareKm);
-const numberOfCells = computed(() => datasetStore.numberOfCells);
 const timeSeriesData = computed(() => props.traces);
 const hasMultipleTimeSeries = computed(
   () => props.traces != null && props.traces.length > 1,
@@ -620,9 +594,8 @@ watch(layoutMetadata, (layout) => {
 
 .time-series-toolbar__group--metrics {
   display: flex;
-  flex: 1 1 280px;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex: 0 1 auto;
+  align-items: center;
 }
 
 .time-series-toolbar__range {
@@ -638,10 +611,6 @@ watch(layoutMetadata, (layout) => {
   flex-wrap: wrap;
   align-items: center;
   gap: 4px;
-}
-
-.time-series-metric {
-  background-color: #e4e7ef;
 }
 
 .time-series-range-field {

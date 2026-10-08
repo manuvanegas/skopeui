@@ -63,6 +63,7 @@ export function createDatasetStore(overrides: Record<string, unknown> = {}) {
     setTimeSeriesLoaded: vi.fn(),
     setTimeSeriesNoArea: vi.fn(),
     setTimeSeries: vi.fn(),
+    setAreaSummary: vi.fn(),
     clearTimeSeriesData: vi.fn(),
     setTimeSeriesBadRequest: vi.fn(),
     setTimeSeriesServerError: vi.fn(),

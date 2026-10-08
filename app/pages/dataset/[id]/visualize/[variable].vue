@@ -43,7 +43,6 @@
         >
           <TimeSeriesPlot
             ref="timeSeriesPlotRef"
-            :show-area="true"
             :show-step-controls="true"
             :traces="traces"
             :step-selected="stepSelected"
@@ -127,7 +126,7 @@ async function updateTimeSeries(data: any) {
     datasetStore.setTimeSeries({
       timeSeries,
       numberOfCells: response.n_cells,
-      totalCellArea: response.area,
+      area: response.area,
     });
     datasetStore.setTimeSeriesLoaded();
   } catch (e: any) {
