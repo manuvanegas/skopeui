@@ -745,7 +745,11 @@ onMounted(() => {
         }),
   });
 
-  map.addControl(new maplibregl.NavigationControl(), "top-right");
+  // No compass: the map isn't meant to be rotated, so it had nothing to reset.
+  map.addControl(
+    new maplibregl.NavigationControl({ showCompass: false }),
+    "top-right",
+  );
   map.addControl(
     {
       onAdd: () => {
