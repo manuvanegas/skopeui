@@ -116,7 +116,11 @@ import circleToPolygon from "circle-to-polygon";
 import { bbox as turfBbox } from "@turf/turf";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "@geoman-io/maplibre-geoman-free/dist/maplibre-geoman.css";
-import { LEAFLET_PROVIDERS, TILES_ENDPOINT } from "@/store/modules/constants";
+import {
+  DEFAULT_BASEMAP,
+  LEAFLET_PROVIDERS,
+  TILES_ENDPOINT,
+} from "@/store/modules/constants";
 import { useLegacyStoreActions } from "@/composables/useLegacyStoreActions";
 import {
   getInitialMapViewport,
@@ -172,7 +176,6 @@ type MapLibreBaseLayer = {
   name: string;
   tiles: string[];
   attribution: string;
-  visible: number | boolean | undefined;
 };
 
 function providerNameToId(name: string) {
@@ -211,18 +214,13 @@ const mapBaseLayers: MapLibreBaseLayer[] = LEAFLET_PROVIDERS.map(
     name: provider.name,
     tiles: providerToMapLibreTiles(provider),
     attribution: provider.attribution,
-    visible: provider.visible,
   }),
 ).filter((provider: MapLibreBaseLayer) => provider.tiles.length > 0);
 
-function getDefaultBaseLayerId(step: number) {
-  const matchedByStep = mapBaseLayers.find(
-    (provider) => provider.visible === step,
-  );
-  return (matchedByStep || mapBaseLayers[0])?.id || "";
-}
-
-const selectedBaseLayerId = ref(getDefaultBaseLayerId(currentStep.value));
+const defaultBaseLayer =
+  mapBaseLayers.find((provider) => provider.name === DEFAULT_BASEMAP) ??
+  mapBaseLayers[0];
+const selectedBaseLayerId = ref(defaultBaseLayer?.id ?? "");
 const baseLayerOptions = computed(() =>
   mapBaseLayers.map((provider) => ({
     title: provider.name,
@@ -761,13 +759,6 @@ watch(
   () => metadata.value?.bbox,
   () => {
     addMetadataExtentLayer();
-  },
-);
-
-watch(
-  () => currentStep.value,
-  (step: number) => {
-    selectedBaseLayerId.value = getDefaultBaseLayerId(step);
   },
 );
 

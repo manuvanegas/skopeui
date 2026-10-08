@@ -113,7 +113,7 @@
 <script setup lang="ts">
 import { computed, watch, onUnmounted } from "vue";
 import { useRoute } from "vue-router";
-import { LEAFLET_PROVIDERS } from "@/store/modules/constants";
+import { DEFAULT_BASEMAP, LEAFLET_PROVIDERS } from "@/store/modules/constants";
 import circleToPolygon from "circle-to-polygon";
 import { useLegacyStoreActions } from "@/composables/useLegacyStoreActions";
 import {
@@ -183,7 +183,7 @@ const areaStyle = computed(() => ({
 }));
 
 function isVisible(provider: any) {
-  return currentStep.value === provider.visible;
+  return provider.name === DEFAULT_BASEMAP;
 }
 
 function addDrawToolbar(map: any) {

@@ -9,34 +9,24 @@ export const TILES_ENDPOINT = `${API_HOST_URL}/tiles`;
 export const TIMESERIES_SUBMIT_ENDPOINT = `${API_HOST_URL}/timeseries/extract`;
 export const TIMESERIES_STATUS_ENDPOINT = `${API_HOST_URL}/timeseries/status`;
 export const TIMESERIES_REFINE_ENDPOINT = `${API_HOST_URL}/timeseries/analyze`;
+// Every map starts on the topographic basemap, like the landing page's cards.
+export const DEFAULT_BASEMAP = "Esri.WorldTopoMap";
 export const LEAFLET_PROVIDERS = [
-  {
-    name: "CartoDB.Positron",
-    url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-    visible: 2,
-    attribution:
-      'OpenStreetMap &copy; <a href="//carto.com/attributions">CARTO</a>',
-    subdomains: "abcd",
-  },
-  {
-    name: "Stamen.TonerLite",
-    url: "https://stamen-tiles-{s}.a.ssl.fastly.net/toner-lite/{z}/{x}/{y}{r}.png",
-    visible: false,
-    attribution:
-      'Tiles &copy; <a href="//stamen.com">Stamen Design</a> <a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>',
-  },
-  {
-    name: "Esri.WorldTerrain",
-    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}",
-    visible: false,
-    attribution:
-      "Tiles &copy; Esri &mdash; Source: USGS, Esri, TANA, DeLorme, and NPS",
-  },
   {
     name: "Esri.WorldTopoMap",
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
     attribution: "Tiles &copy; Esri et al",
-    visible: 1,
+  },
+  {
+    name: "Esri.WorldGrayCanvas",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+    attribution: "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ",
+  },
+  {
+    name: "Esri.WorldTerrain",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}",
+    attribution:
+      "Tiles &copy; Esri &mdash; Source: USGS, Esri, TANA, DeLorme, and NPS",
   },
 ];
 

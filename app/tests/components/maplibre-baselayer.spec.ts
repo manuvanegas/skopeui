@@ -179,18 +179,17 @@ vi.mock("@/composables/useLegacyStoreActions", () => ({
 
 vi.mock("@/store/modules/constants", () => ({
   TILES_ENDPOINT: "https://test.example.com/tiles",
+  DEFAULT_BASEMAP: "Esri.WorldTopoMap",
   LEAFLET_PROVIDERS: [
     {
       name: "CartoDB.Positron",
       url: "https://{s}.example.com/light/{z}/{x}/{y}{r}.png",
-      visible: 2,
       attribution: "Carto",
       subdomains: "ab",
     },
     {
       name: "Esri.WorldTopoMap",
       url: "https://example.com/topo/{z}/{y}/{x}",
-      visible: 1,
       attribution: "Esri",
     },
   ],
@@ -269,7 +268,7 @@ describe("MapLibre basemap selector", () => {
     vi.clearAllMocks();
   });
 
-  it("[behavior] defaults to the step-configured basemap", async () => {
+  it("[behavior] starts on the default basemap", async () => {
     await mount(MapLibre, {
       global: {
         stubs: uiStubs,
@@ -285,6 +284,22 @@ describe("MapLibre basemap selector", () => {
 
     expect(topo.layout?.visibility).toBe("visible");
     expect(carto.layout?.visibility).toBe("none");
+  });
+
+  it("[behavior] starts on the default basemap on visualize too", async () => {
+    mocks.routeState.name = "dataset-id-visualize-variable";
+    mocks.routeState.params = { id: "paleocar", variable: "ppt_annual" };
+
+    mount(MapLibre, { global: { stubs: uiStubs } });
+    await flushPromises();
+
+    const map = mocks.mapInstances[0];
+    expect(
+      map.getLayer("basemap-layer-esri-worldtopomap").layout?.visibility,
+    ).toBe("visible");
+    expect(
+      map.getLayer("basemap-layer-cartodb-positron").layout?.visibility,
+    ).toBe("none");
   });
 
   it("[behavior] updates basemap visibility when selection changes", async () => {
