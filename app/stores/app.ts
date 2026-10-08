@@ -14,7 +14,7 @@ const steps: AppStep[] = [
     id: 3,
     name: "dataset-id-visualize-variable",
     label: "Visualize",
-    icon: "mdi-chart-bar",
+    icon: "mdi-map-clock-outline",
   },
   {
     id: 4,
@@ -25,13 +25,15 @@ const steps: AppStep[] = [
 ];
 
 export const useAppStore = defineStore("app", {
+  // The steps are fixed, so they aren't state: state is serialized into the
+  // server-rendered page, which then outranks the client's own copy.
   state: () => ({
     isNavigationVisible: false,
     isFirstVisit: true,
-    steps,
   }),
   getters: {
-    stepNames: (state) => state.steps.map((step) => step.name),
+    steps: () => steps,
+    stepNames: () => steps.map((step) => step.name),
     isVisible: () => true,
   },
   actions: {

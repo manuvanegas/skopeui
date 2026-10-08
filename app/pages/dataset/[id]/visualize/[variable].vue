@@ -6,15 +6,6 @@
         <v-col class="pa-0 ma-0">
           <SubHeader :select-variable="true">
             <v-btn
-              :to="selectAreaLocation"
-              color="accent"
-              variant="outlined"
-              class="mr-2"
-            >
-              <v-icon class="mr-2" size="small"> mdi-chevron-left </v-icon>
-              Select Area
-            </v-btn>
-            <v-btn
               :disabled="!hasValidStudyArea"
               :to="analyzeLocation"
               color="accent"
@@ -90,10 +81,6 @@ const stepSelected = ref(1500);
 let stopTimeSeriesWatch: (() => void) | null = null;
 
 const hasValidStudyArea = computed(() => datasetStore.hasGeoJson);
-const selectAreaLocation = computed(() => ({
-  name: "dataset-id",
-  params: { id: route.params.id },
-}));
 const analyzeLocation = computed(() => ({
   name: "dataset-id-analyze-variable",
   params: { id: route.params.id, variable: route.params.variable },
@@ -210,8 +197,10 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* The viewport less the app bar, step bar and page title, so the panels fit
+   a laptop screen. */
 .map-flex {
-  height: calc(85vh - 96px);
+  height: calc(100vh - 250px);
 }
 
 @media all and (max-width: 960px) {

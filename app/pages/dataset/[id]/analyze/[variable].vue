@@ -5,15 +5,6 @@
       <v-row no-gutters>
         <v-col>
           <SubHeader :select-variable="true">
-            <v-btn
-              :to="visualizeLocation"
-              color="accent"
-              variant="outlined"
-              class="mr-2"
-            >
-              <v-icon class="mr-2" size="small"> mdi-chevron-left </v-icon>
-              Visualize
-            </v-btn>
             <v-btn color="accent" variant="flat" @click="exportData">
               Download
               <v-icon class="ml-2" size="small">mdi-download</v-icon>
@@ -180,10 +171,6 @@ import Papa from "papaparse";
 definePageMeta({ layout: "default", middleware: ["requires-study-area"] });
 
 const route = useRoute();
-const visualizeLocation = computed(() => ({
-  name: "dataset-id-visualize-variable",
-  params: { id: route.params.id, variable: route.params.variable },
-}));
 const { mdAndDown } = useDisplay();
 const analysisStore = useAnalysisStore();
 const datasetStore = useDatasetStore();
@@ -591,8 +578,10 @@ whenever(
 </script>
 
 <style scoped>
+/* The viewport less the app bar, step bar and page title, so the panels fit
+   a laptop screen. */
 .timeseries-flex {
-  height: calc(85vh - 96px);
+  height: calc(100vh - 250px);
 }
 
 .subtitle {

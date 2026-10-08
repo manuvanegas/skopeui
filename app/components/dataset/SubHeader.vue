@@ -36,7 +36,7 @@
       />
     </v-col>
     <v-col cols="auto" class="ml-auto" align="end">
-      <!-- slot for the back and next nav buttons -->
+      <!-- slot for the next nav button -->
       <slot />
     </v-col>
   </v-row>

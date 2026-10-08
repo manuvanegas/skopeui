@@ -1,5 +1,6 @@
 <template>
-  <v-row>
+  <!-- Takes no space without messages. -->
+  <v-row v-if="messages.length > 0">
     <v-col>
       <!-- The store decides which alerts show, so each stays open until it's
            dismissed from the store. -->

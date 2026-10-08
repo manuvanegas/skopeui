@@ -120,8 +120,10 @@ function keepGeometry() {
 }
 </script>
 <style>
+/* The viewport less the app bar, step bar and page title, so the panels fit
+   a laptop screen. */
 .map-flex {
-  height: calc(85vh - 96px);
+  height: calc(100vh - 250px);
 }
 
 @media all and (max-width: 960px) {

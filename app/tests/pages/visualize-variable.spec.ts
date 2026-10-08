@@ -137,20 +137,6 @@ describe("route /dataset/:id/visualize/:variable", () => {
     );
   });
 
-  it("[behavior] goes back to select area", async () => {
-    const wrapper = await mountWithSuspense(VisualizePage, {
-      global: { stubs: layoutStubs },
-    });
-    await flushPromises();
-
-    const back = wrapper
-      .findAll("button")
-      .find((b) => b.text().includes("Select Area"))!;
-    expect(JSON.parse(back.attributes("data-to")!)).toMatchObject({
-      name: "dataset-id",
-    });
-  });
-
   it("[behavior] loads time-series data on mount", async () => {
     await mountWithSuspense(VisualizePage, { global: { stubs: layoutStubs } });
 

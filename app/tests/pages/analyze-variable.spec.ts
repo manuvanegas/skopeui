@@ -151,20 +151,6 @@ describe("route /dataset/:id/analyze/:variable", () => {
     );
   });
 
-  it("[behavior] goes back to visualize, not select area", async () => {
-    const wrapper = await mountWithSuspense(AnalyzePage, {
-      global: { stubs: layoutStubs },
-    });
-    await flushPromises();
-
-    const back = wrapper
-      .findAll("button")
-      .find((b) => b.text().includes("Visualize"))!;
-    expect(JSON.parse(back.attributes("data-to")!)).toMatchObject({
-      name: "dataset-id-visualize-variable",
-    });
-  });
-
   it("[behavior] submits updated request data when Update is clicked", async () => {
     const wrapper = await mountWithSuspense(AnalyzePage, {
       global: { stubs: layoutStubs },
