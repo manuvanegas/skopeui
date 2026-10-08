@@ -205,6 +205,7 @@ import {
 import _ from "lodash";
 import { useRoute } from "vue-router";
 import { useDatasetStore } from "@/stores/dataset";
+import { axisYears, stepAlongAxis } from "@/utils/timeAxis";
 
 const props = defineProps<{
   stepSelected?: number | null;
@@ -281,6 +282,9 @@ const timeSeriesRequestStatus = computed(
 );
 const selectedAreaInSquareKm = computed(
   () => datasetStore.selectedAreaInSquareKm,
+);
+const axis = computed(() =>
+  datasetStore.metadata ? axisYears(datasetStore.metadata.time) : [],
 );
 const minStep = computed(() => datasetStore.minYear);
 const maxStep = computed(() => datasetStore.maxYear);
@@ -483,26 +487,22 @@ function gotoLastStep() {
   setStep(temporalRangeMax.value);
 }
 
-function nextStep() {
-  if (variable.value === null) return;
+function stepBy(delta: number) {
+  if (variable.value === null || props.stepSelected == null) return;
   setStep(
-    _.clamp(
-      parseInt(String(props.stepSelected)) + 1,
+    stepAlongAxis(axis.value, props.stepSelected, delta, [
       temporalRangeMin.value,
       temporalRangeMax.value,
-    ),
+    ]),
   );
 }
 
+function nextStep() {
+  stepBy(1);
+}
+
 function previousStep() {
-  if (variable.value === null) return;
-  setStep(
-    _.clamp(
-      (props.stepSelected ?? 0) - 1,
-      temporalRangeMin.value,
-      temporalRangeMax.value,
-    ),
-  );
+  stepBy(-1);
 }
 
 function advanceAnimation() {

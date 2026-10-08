@@ -140,7 +140,11 @@ describe("route /dataset/:id/visualize/:variable", () => {
     await flushPromises();
 
     expect(datasetStore.setTimeSeriesLoading).toHaveBeenCalled();
-    expect(datasetStore.setTimeSeries).toHaveBeenCalled();
+    expect(datasetStore.setTimeSeries).toHaveBeenCalledWith(
+      expect.objectContaining({
+        timeSeries: expect.objectContaining({ x: [1, 2, 3], y: [10, 20, 30] }),
+      }),
+    );
     expect(datasetStore.setTimeSeriesLoaded).toHaveBeenCalled();
     expect(legacyActions.resolveTimeSeries).toHaveBeenCalled();
     expect(appStore.setVisited).toHaveBeenCalled();

@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { Time } from "@/types/metadata";
-import { timeCoverageLabel, timeSpan, yearOfTimestep } from "@/utils/timeAxis";
+import {
+  axisYears,
+  stepAlongAxis,
+  timeCoverageLabel,
+  timeSpan,
+  timestepKey,
+  yearOfTimestep,
+} from "@/utils/timeAxis";
 
 const annual: Time = {
   kind: "regular",
@@ -31,5 +38,35 @@ describe("time axis labels", () => {
     expect(
       timeCoverageLabel({ ...annual, origin: "2009", end: "2009", step: null }),
     ).toBe("2009 CE");
+  });
+});
+
+describe("time axis steps", () => {
+  it("keys a year with four digits", () => {
+    expect(timestepKey(590)).toBe("0590");
+    expect(timestepKey(2000)).toBe("2000");
+  });
+
+  it("lists every year of a regular annual axis", () => {
+    const years = axisYears({ ...annual, origin: "0103", end: "0106" });
+    expect(years).toEqual([103, 104, 105, 106]);
+  });
+
+  it("lists the years of an enumerated axis", () => {
+    const years = axisYears({
+      ...annual,
+      kind: "enumerated",
+      step: null,
+      values: ["1900", "1950", "2000"],
+    });
+    expect(years).toEqual([1900, 1950, 2000]);
+  });
+
+  it("steps along the axis within the selected range", () => {
+    const years = [1900, 1950, 2000, 2050];
+    expect(stepAlongAxis(years, 1950, 1, [1900, 2050])).toBe(2000);
+    expect(stepAlongAxis(years, 1950, -1, [1900, 2050])).toBe(1900);
+    expect(stepAlongAxis(years, 2000, 1, [1900, 2000])).toBe(2000);
+    expect(stepAlongAxis(years, 1960, 1, [1900, 2050])).toBe(2000);
   });
 });

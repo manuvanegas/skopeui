@@ -141,6 +141,28 @@ describe("migrated pinia stores", () => {
     expect(store.timeSeriesRequestStatus.status).toBe("no-area");
   });
 
+  it("dataset store keeps the points of the selected years, empty ones included", () => {
+    const store = useDatasetStore();
+
+    store.setMetadata(metadataFixture.datasets[0] as Dataset);
+    store.setTemporalRange([416, 418]);
+    store.setTimeSeries({
+      timeSeries: {
+        x: [415, 416, 417, 418, 419],
+        y: [1, 2, null, null, 5],
+        options: { name: "Original" },
+      },
+      numberOfCells: 2,
+      totalCellArea: 2000000,
+    });
+
+    expect(store.filteredTimeSeries()).toEqual({
+      x: [416, 417, 418],
+      y: [2, null, null],
+      name: "Original",
+    });
+  });
+
   it("dataset store preserves already constrained time series without double filtering", () => {
     const store = useDatasetStore();
 
@@ -252,13 +274,15 @@ describe("migrated pinia stores", () => {
       summary_stats: [{ name: "Original", stdev: 2, mean: 3, median: 3 }],
       series: [
         {
-          time_range: { gte: "0001-01-01", lte: "0003-01-01" },
-          values: [1, 2, 3],
+          time_range: { gte: "0416", lte: "0590" },
+          timesteps: ["0416", "0417", "0590"],
+          values: [1, null, 3],
           options: { name: "Original" },
         },
       ],
     } as any);
     expect(store.summaryStatistics[0].name).toBe("Original");
-    expect(store.timeseries[0].x).toEqual([1, 2, 3]);
+    expect(store.timeseries[0].x).toEqual([416, 417, 590]);
+    expect(store.timeseries[0].y).toEqual([1, null, 3]);
   });
 });

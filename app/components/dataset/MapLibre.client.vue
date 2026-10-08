@@ -109,6 +109,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import maplibregl from "maplibre-gl";
 import { SkopeColorbar, type ColorbarOptions } from "@/utils/SkopeColorbar";
+import { timestepKey } from "@/utils/timeAxis";
 import type { Geoman } from "@geoman-io/maplibre-geoman-free";
 import { createGeomanInstance } from "@geoman-io/maplibre-geoman-free";
 import circleToPolygon from "circle-to-polygon";
@@ -312,8 +313,7 @@ function getCogBaseUrl(): string | null {
 // The API colours tiles from the variable's display entry, so the URL carries
 // no colormap or rescale.
 function getCogFullUrl(baseUrl: string, step: number) {
-  const urlStep = step.toString().padStart(4, "0"); // TODO: Add flexibility for different time resolutions
-  return `${baseUrl}/${urlStep}/{z}/{x}/{y}`;
+  return `${baseUrl}/${timestepKey(step)}/{z}/{x}/{y}`;
 }
 
 // Tiles are only requested inside the dataset's bbox, [west, south, east, north].

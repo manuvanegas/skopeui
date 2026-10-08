@@ -13,7 +13,8 @@ export const timeSeriesResponseFixture = {
   summary_stats: [{ name: "Original", mean: 1, median: 1, stdev: 0 }],
   series: [
     {
-      time_range: { gte: "0001-01-01", lte: "0003-01-01" },
+      time_range: { gte: "0001", lte: "0003" },
+      timesteps: ["0001", "0002", "0003"],
       values: [10, 20, 30],
       options: { name: "Original" },
     },

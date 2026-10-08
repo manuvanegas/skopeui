@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
-import { extractYear, formatStats } from "@/store/stats";
+import { formatStats } from "@/store/stats";
+import { yearOfTimestep } from "@/utils/timeAxis";
 
 const EMPTY_RESPONSE = {
   area: 0,
@@ -22,13 +23,7 @@ export const useAnalysisStore = defineStore("analysis", {
   getters: {
     derivedTimeseries: (state) => {
       return (state.response?.series || []).map((s: any) => ({
-        x: Array.from(
-          {
-            length:
-              extractYear(s.time_range.lte) - extractYear(s.time_range.gte) + 1,
-          },
-          (_, i) => extractYear(s.time_range.gte) + i,
-        ),
+        x: s.timesteps.map(yearOfTimestep),
         y: s.values,
         name: s.options?.name,
       }));

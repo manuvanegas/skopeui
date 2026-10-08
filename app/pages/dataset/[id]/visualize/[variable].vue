@@ -62,8 +62,7 @@ import Map from "@/components/dataset/Map.client.vue";
 import TimeSeriesPlot from "@/components/dataset/TimeSeriesPlot.vue";
 import SubHeader from "@/components/dataset/SubHeader.vue";
 import LoadingSpinner from "@/components/LoadingSpinner.vue";
-import _ from "lodash";
-import { extractYear } from "@/store/stats";
+import { yearOfTimestep } from "@/utils/timeAxis";
 import { useAppStore } from "@/stores/app";
 import { useDatasetStore } from "@/stores/dataset";
 import { useMessagesStore } from "@/stores/messages";
@@ -120,10 +119,7 @@ async function updateTimeSeries(data: any) {
     datasetStore.setJobId(varId, newJobId);
     const originalSeries = response.series[0];
     const timeSeries = {
-      x: _.range(
-        extractYear(originalSeries.time_range.gte),
-        extractYear(originalSeries.time_range.lte) + 1,
-      ),
+      x: originalSeries.timesteps.map(yearOfTimestep),
       y: originalSeries.values,
       options: originalSeries.options,
     };

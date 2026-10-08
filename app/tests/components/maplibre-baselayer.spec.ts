@@ -459,4 +459,20 @@ describe("MapLibre basemap selector", () => {
       ],
     ]);
   });
+
+  it("[behavior] requests tiles by the timestep's key", async () => {
+    mocks.routeState.name = "dataset-id-visualize-variable";
+    mocks.routeState.params = { id: "paleocar", variable: "ppt_annual" };
+    mocks.datasetStore.variable = ppt;
+
+    await mount(MapLibre, {
+      global: { stubs: uiStubs },
+      props: { step: 590 },
+    });
+    await flushPromises();
+    await nextTick();
+
+    const source = mocks.mapInstances[0].getStyle().sources["cog-source-a"];
+    expect(source.tiles[0]).toContain("/ppt_annual/0590/{z}/{x}/{y}");
+  });
 });

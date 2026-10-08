@@ -225,27 +225,17 @@ export const useDatasetStore = defineStore("dataset", {
         median: "N/A",
       };
     },
+    // The points whose timestep falls in the selected range. Each x comes from
+    // the response's timesteps, so this holds on any axis.
     filteredTimeSeries() {
       const [start, end] = this.temporalRange;
-      const min = this.minYear;
-      if (this.timeSeries.x.length === 0) {
-        return { x: [], y: [] };
-      }
-
-      const selectedRangeLength = end - start + 1;
-      if (this.timeSeries.x.length === selectedRangeLength) {
-        return {
-          x: this.timeSeries.x,
-          y: this.timeSeries.y,
-          name: this.timeSeries.options?.name || "Original",
-        };
-      }
-
-      const minOffset = start - min;
-      const maxOffset = end - min + 1;
+      const { x, y } = this.timeSeries;
+      const inRange = x.flatMap((year, i) =>
+        year >= start && year <= end ? [i] : [],
+      );
       return {
-        x: this.timeSeries.x.slice(minOffset, maxOffset),
-        y: this.timeSeries.y.slice(minOffset, maxOffset),
+        x: inRange.map((i) => x[i]),
+        y: inRange.map((i) => y[i]),
         name: this.timeSeries.options?.name || "Original",
       };
     },
