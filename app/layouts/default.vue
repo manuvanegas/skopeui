@@ -33,6 +33,6 @@ const metadataStore = useMetadataStore();
 // Messages belong to the page that raised them.
 watch(
   () => route.path,
-  () => messagesStore.clearMessages(),
+  () => messagesStore.clearOnNavigation(),
 );
 </script>

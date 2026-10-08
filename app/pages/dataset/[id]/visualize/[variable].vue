@@ -71,6 +71,7 @@ import { useLegacyStoreActions } from "@/composables/useLegacyStoreActions";
 definePageMeta({
   layout: "default",
   key: (route: any) => route.fullPath,
+  middleware: ["requires-study-area"],
 });
 
 const route = useRoute();

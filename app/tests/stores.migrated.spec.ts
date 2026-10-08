@@ -54,6 +54,20 @@ describe("migrated pinia stores", () => {
     expect(store.messages).toEqual([]);
   });
 
+  it("messages store keeps only the messages raised for the page being opened", () => {
+    const store = useMessagesStore();
+
+    store.error("from the last page");
+    store.info("for the next page", { keepOnNavigation: true });
+    store.clearOnNavigation();
+    expect(store.messages).toEqual([
+      { type: "info", message: "for the next page" },
+    ]);
+
+    store.clearOnNavigation();
+    expect(store.messages).toEqual([]);
+  });
+
   it("dataset store updates variable, temporal range, metadata, and geojson", () => {
     const store = useDatasetStore();
 

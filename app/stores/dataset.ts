@@ -46,6 +46,11 @@ function selectedAreaInSquareKmFromGeoJson(geoJson: unknown): string {
 
 type DatasetVariable = Partial<Variable> & { id: string | null };
 
+/** Where a dataset's study area is kept in the browser. */
+export function studyAreaKey(datasetId: string) {
+  return `geojson:${datasetId}`;
+}
+
 export const useDatasetStore = defineStore("dataset", {
   state: () => ({
     timeSeries: {
@@ -88,7 +93,7 @@ export const useDatasetStore = defineStore("dataset", {
     },
     geoJsonKey: (state) => {
       const metadataId = state.metadata?.id;
-      return metadataId ? `geojson:${metadataId}` : "skope:geometry";
+      return metadataId ? studyAreaKey(metadataId) : "skope:geometry";
     },
     defaultApiRequestData: (state) => {
       const metadata = state.metadata;

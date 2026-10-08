@@ -167,7 +167,7 @@ import _ from "lodash";
 import JSZip from "jszip";
 import Papa from "papaparse";
 
-definePageMeta({ layout: "default" });
+definePageMeta({ layout: "default", middleware: ["requires-study-area"] });
 
 const route = useRoute();
 const { mdAndDown } = useDisplay();
@@ -337,6 +337,11 @@ function smoothingHint(smooth: string) {
 }
 
 async function retrieveAnalysis(data: any) {
+  // Like visualize: say there's no area instead of leaving a blank plot.
+  if (!data.selected_area) {
+    datasetStore.setTimeSeriesNoArea();
+    return;
+  }
   if (Object.values(data).some((v) => v == undefined)) return;
   datasetStore.setGeoJson(data.selected_area);
   datasetStore.setTemporalRange([
