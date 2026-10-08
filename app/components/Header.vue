@@ -1,5 +1,6 @@
 <template>
-  <v-app-bar src="/header.png">
+  <!-- Tall enough for the title and subtitle; at 64px the title was cut. -->
+  <v-app-bar src="/header.png" height="80">
     <template #img="{ props }">
       <v-img v-bind="props" cover />
     </template>
@@ -52,6 +53,7 @@ function toggleNavigationDrawer() {
   font-family: $skope-title-font;
   font-weight: bold;
   font-size: 2.3em;
+  line-height: 1.1;
 }
 
 .skope-subtitle {
@@ -59,5 +61,6 @@ function toggleNavigationDrawer() {
   font-family: $skope-title-font;
   font-weight: bolder;
   font-size: 1.2rem;
+  line-height: 1.2;
 }
 </style>

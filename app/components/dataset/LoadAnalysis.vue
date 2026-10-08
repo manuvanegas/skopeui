@@ -1,21 +1,29 @@
 <template>
-  <!-- load analysis button / component -->
-  <v-btn
-    color="primary"
-    rounded
-    class="mt-1"
-    @click="selectLoadRequestDataFile"
+  <!-- Short enough for the navigation drawer; the tooltip names the file. -->
+  <v-tooltip
+    location="bottom"
+    text="Load the skope-request.json from a downloaded analysis (experimental)"
   >
-    <input
-      id="loadRequestDataFile"
-      type="file"
-      accept=".json"
-      style="display: none"
-      @change="handleLoadRequestDataFile"
-    >
-    <v-icon left dark>mdi-upload</v-icon>
-    Load skope-request.json file (experimental)
-  </v-btn>
+    <template #activator="{ props }">
+      <v-btn
+        v-bind="props"
+        color="primary"
+        rounded
+        prepend-icon="mdi-upload"
+        class="mt-1"
+        @click="selectLoadRequestDataFile"
+      >
+        <input
+          id="loadRequestDataFile"
+          type="file"
+          accept=".json"
+          style="display: none"
+          @change="handleLoadRequestDataFile"
+        >
+        Load saved analysis
+      </v-btn>
+    </template>
+  </v-tooltip>
 </template>
 <script setup lang="ts">
 import { useRouter } from "vue-router";
