@@ -536,12 +536,15 @@ async function getTimeSeriesPlotImage() {
   return { png, svg };
 }
 
+// Watch the status object, not its `status` string: every request sets a new
+// object, so a first request (loading -> loading) restarts the messages too.
 watch(
-  () => timeSeriesRequestStatus.value.status,
-  (status) => {
+  timeSeriesRequestStatus,
+  ({ status }) => {
     if (status === "loading") startProgressiveMessages();
     else clearProgressiveMessages();
   },
+  { immediate: true },
 );
 
 onUnmounted(() => {

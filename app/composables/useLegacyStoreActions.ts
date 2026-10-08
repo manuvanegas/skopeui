@@ -43,6 +43,9 @@ async function requestJson(url: string, options: RequestInit = {}) {
   return response.json();
 }
 
+// /analyze statuses that mean the cached extraction can't be used.
+const RESUBMIT_STATUSES = [404, 409, 422];
+
 export function useLegacyStoreActions() {
   const metadataStore = useMetadataStore();
   const datasetStore = useDatasetStore();
@@ -223,12 +226,13 @@ export function useLegacyStoreActions() {
         );
         return { newJobId: existingJobId, response: response };
       } catch (error: any) {
-        if (error.response?.status !== 404 && error.response?.status !== 422) {
+        if (!RESUBMIT_STATUSES.includes(error.response?.status)) {
           throw error;
         }
       }
     }
-    // if no existing job or error status is 404 or 422 (job if not found or invalid), submit a new request
+    // No usable extraction: none yet, expired (404), incomplete (409) or
+    // unusable (422). Clients may resubmit stale jobs (skope-api ADR 0005).
     const newJobId = await submitTimeSeriesRequest(requestData);
     const response = await pollTimeSeriesStatus(newJobId);
     const result = response.result;

@@ -3,7 +3,7 @@ import { API_HOST_URL, BUILD_ID } from "@/store/modules/_constants";
 import { toISODate } from "@/store/stats";
 
 export const DEFAULT_CENTERED_SMOOTHING_WIDTH = 11;
-export const DEFAULT_MAX_PROCESSING_TIME = 10000; // in ms
+export const DEFAULT_MAX_PROCESSING_TIME = 20000; // in ms
 export const METADATA_ENDPOINT = `${API_HOST_URL}/metadata`;
 export const TILES_ENDPOINT = `${API_HOST_URL}/tiles`;
 export const TIMESERIES_SUBMIT_ENDPOINT = `${API_HOST_URL}/timeseries/extract`;
