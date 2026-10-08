@@ -44,15 +44,7 @@ function selectedAreaInSquareKmFromGeoJson(geoJson: unknown): string {
   }
 }
 
-// The legacy rendering fields go when the map reads `display`.
-type DatasetVariable = Partial<Variable> & {
-  id: string | null;
-  units?: string;
-  min?: number;
-  max?: number;
-  colormap?: string;
-  colormap_stops?: string[];
-};
+type DatasetVariable = Partial<Variable> & { id: string | null };
 
 export const useDatasetStore = defineStore("dataset", {
   state: () => ({

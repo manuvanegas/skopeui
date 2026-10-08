@@ -3,6 +3,10 @@ import { defineComponent, h, nextTick } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import MapLibre from "@/components/dataset/MapLibre.client.vue";
+import metadataFixture from "@/tests/fixtures/metadata-1.0.0.json";
+import { SkopeColorbar } from "@/utils/SkopeColorbar";
+
+const ppt = metadataFixture.datasets[0].variables[0];
 
 type MockLayer = {
   id: string;
@@ -356,42 +360,42 @@ describe("MapLibre basemap selector", () => {
     expect(map.getLayer("study-area-display-outline")).toBeDefined();
   });
 
-  it("[behavior] omits an absent colormap from tile requests", async () => {
+  it("[behavior] leaves colouring to the API in tile requests", async () => {
     mocks.routeState.name = "dataset-id-visualize-variable";
-    mocks.routeState.params = { id: "paleocar", variable: "tasmax" };
-    mocks.datasetStore.variable = {
-      id: "tasmax",
-      min: 0,
-      max: 100,
-      colormap_stops: ["#000000", "#ffffff"],
-    };
+    mocks.routeState.params = { id: "paleocar", variable: "ppt_annual" };
+    mocks.datasetStore.variable = ppt;
 
-    await mount(MapLibre, { global: { stubs: uiStubs } });
+    await mount(MapLibre, {
+      global: { stubs: uiStubs },
+      props: { step: 1500 },
+    });
     await flushPromises();
     await nextTick();
 
     const source = mocks.mapInstances[0].getStyle().sources["cog-source-a"];
-    expect(source.tiles[0]).toContain("rescale=0%2C50");
-    expect(source.tiles[0]).not.toContain("colormap=");
+    expect(source.tiles[0]).toBe(
+      "https://test.example.com/tiles/paleocar/ppt_annual/1500/{z}/{x}/{y}",
+    );
   });
 
-  it("[behavior] sends the colormap advertised by API metadata", async () => {
+  it("[behavior] draws the legend from the display entry unchanged", async () => {
     mocks.routeState.name = "dataset-id-visualize-variable";
-    mocks.routeState.params = { id: "paleocar", variable: "tasmax" };
-    mocks.datasetStore.variable = {
-      id: "tasmax",
-      min: 0,
-      max: 100,
-      colormap: "viridis",
-      colormap_stops: ["#000000", "#ffffff"],
-    };
+    mocks.routeState.params = { id: "paleocar", variable: "ppt_annual" };
+    mocks.datasetStore.variable = ppt;
 
     await mount(MapLibre, { global: { stubs: uiStubs } });
     await flushPromises();
     await nextTick();
 
-    const source = mocks.mapInstances[0].getStyle().sources["cog-source-a"];
-    expect(source.tiles[0]).toContain("colormap=viridis");
+    const colorbar = mocks.mapInstances[0].addControl.mock.calls
+      .map(([control]: any[]) => control)
+      .find((control: any) => control instanceof SkopeColorbar);
+    expect(colorbar._options).toEqual({
+      colors: ppt.display.colors,
+      range: [0, 1807.5],
+      ticks: 5,
+      units: "mm",
+    });
   });
 
   it("[behavior] opens on the dataset's map_view", async () => {

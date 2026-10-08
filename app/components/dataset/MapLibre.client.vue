@@ -108,7 +108,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import maplibregl from "maplibre-gl";
-import { SkopeColorbar } from "@/utils/SkopeColorbar";
+import { SkopeColorbar, type ColorbarOptions } from "@/utils/SkopeColorbar";
 import type { Geoman } from "@geoman-io/maplibre-geoman-free";
 import { createGeomanInstance } from "@geoman-io/maplibre-geoman-free";
 import circleToPolygon from "circle-to-polygon";
@@ -124,8 +124,6 @@ import {
 import { useAppStore } from "@/stores/app";
 import { useDatasetStore } from "@/stores/dataset";
 import { useMessagesStore } from "@/stores/messages";
-
-const COLOR_MAX_PCT = 0.5;
 
 let colorbar: SkopeColorbar | null = null;
 
@@ -155,10 +153,19 @@ const isSelectArea = computed(() => currentStep.value === 1);
 
 const cogBaseUrl = computed(getCogBaseUrl);
 const legendVisible = computed(() => props.displayRaster && !!cogBaseUrl.value);
-const variableUnit = computed(() => datasetStore.variable?.units ?? null);
-// Raw numeric values (used for midpoint arithmetic)
-const minVal = computed(() => datasetStore.variable?.min ?? 0);
-const maxVal = computed(() => datasetStore.variable?.max ?? 100);
+// The legend draws the variable's display entry as served, so it shows the
+// same range and palette the API used for the tiles (DISP-004).
+const legendOptions = computed((): ColorbarOptions | null => {
+  const variable = datasetStore.variable;
+  const display = variable?.display;
+  if (!display?.range || display.colors.length < 2) return null;
+  return {
+    colors: display.colors,
+    range: display.range,
+    ticks: display.ticks,
+    units: variable.unit,
+  };
+});
 type MapLibreBaseLayer = {
   id: string;
   name: string;
@@ -302,19 +309,11 @@ function getCogBaseUrl(): string | null {
   return `${TILES_ENDPOINT}/${datasetId}/${varId}`;
 }
 
-function getCogFullUrl(baseUrl, step) {
-  const variable = datasetStore.variable;
-  if (variable?.min == null || variable?.max == null) {
-    console.warn(
-      `Variable ${variable?.id} is missing min/max — falling back to rescale 0,100`,
-    );
-  }
-  const min = variable?.min ?? 0;
-  const max = (variable?.max ?? 100) * COLOR_MAX_PCT;
+// The API colours tiles from the variable's display entry, so the URL carries
+// no colormap or rescale.
+function getCogFullUrl(baseUrl: string, step: number) {
   const urlStep = step.toString().padStart(4, "0"); // TODO: Add flexibility for different time resolutions
-  const params = new URLSearchParams({ rescale: `${min},${max}` });
-  if (variable?.colormap) params.set("colormap", variable.colormap);
-  return `${baseUrl}/${urlStep}/{z}/{x}/{y}?${params.toString()}`;
+  return `${baseUrl}/${urlStep}/{z}/{x}/{y}`;
 }
 
 // Tiles are only requested inside the dataset's bbox, [west, south, east, north].
@@ -728,23 +727,15 @@ onMounted(() => {
     }
 
     if (props.displayRaster) {
-      const variable = datasetStore.variable;
-      const colormapStops = variable?.colormap_stops;
-      if (!Array.isArray(colormapStops) || colormapStops.length < 2) {
+      if (legendOptions.value == null) {
         console.error(
-          `Variable '${variable?.id}' has invalid colormap_stops (got ${JSON.stringify(colormapStops)}). Colorbar will not be shown.`,
+          `Variable '${datasetStore.variable?.id}' has no continuous display range and colours (got ${JSON.stringify(datasetStore.variable?.display)}). Colorbar will not be shown.`,
         );
         messageStore.error(
-          "Colormap data is missing or invalid for this variable. The legend cannot be displayed.",
+          "The legend for this variable is missing or invalid, so it can't be displayed.",
         );
       } else {
-        colorbar = new SkopeColorbar({
-          colors: colormapStops,
-          vmin: minVal.value,
-          vmax: maxVal.value * COLOR_MAX_PCT,
-          units: variableUnit.value ?? undefined,
-          vmaxPct: COLOR_MAX_PCT,
-        });
+        colorbar = new SkopeColorbar(legendOptions.value);
         map.addControl(colorbar, "bottom-left");
       }
     }
@@ -794,12 +785,8 @@ watch(
   },
 );
 
-watch([minVal, maxVal, variableUnit], () => {
-  colorbar?.update({
-    vmin: minVal.value,
-    vmax: maxVal.value * COLOR_MAX_PCT,
-    units: variableUnit.value ?? undefined,
-  });
+watch(legendOptions, (options) => {
+  if (options) colorbar?.update(options);
 });
 
 watch(legendVisible, (visible) => {
