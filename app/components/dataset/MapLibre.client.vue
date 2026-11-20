@@ -43,6 +43,7 @@
           Download GeoJSON
         </v-btn>
       </div>
+      <slot name="header-end" />
     </PanelHeader>
     <v-card-text class="map">
       <div class="map-frame">

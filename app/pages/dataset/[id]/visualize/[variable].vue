@@ -47,6 +47,19 @@
             @step-ready="frameReady"
             @step-error="frameFailed"
           >
+            <template #header-end>
+              <v-text-field
+                :model-value="stepSelected"
+                :label="temporalLabels.current"
+                :aria-label="temporalLabels.current"
+                class="map-current-year"
+                density="compact"
+                variant="outlined"
+                readonly
+                hide-details
+                data-test="map-current-year"
+              />
+            </template>
             <template #footer>
               <RasterPlaybackControls
                 :step-selected="stepSelected"
@@ -87,7 +100,7 @@ import RasterPlaybackControls from "@/components/dataset/RasterPlaybackControls.
 import TimeSeriesPlot from "@/components/dataset/TimeSeriesPlot.vue";
 import SubHeader from "@/components/dataset/SubHeader.vue";
 import DatasetLoadState from "@/components/dataset/DatasetLoadState.vue";
-import { axisYears } from "@/utils/timeAxis";
+import { axisYears, resolveTemporalLabels } from "@/utils/timeAxis";
 import { useRasterPlayback } from "@/composables/useRasterPlayback";
 import { useAppStore } from "@/stores/app";
 import { useDatasetStore } from "@/stores/dataset";
@@ -116,6 +129,9 @@ const { run: requestTimeSeries } = useTimeSeriesRequest("visualize");
 
 const playbackYears = computed(() =>
   datasetStore.metadata?.time ? axisYears(datasetStore.metadata.time) : [],
+);
+const temporalLabels = computed(() =>
+  resolveTemporalLabels(datasetStore.metadata?.time),
 );
 const playbackRange = computed(
   () => datasetStore.temporalRange as [number, number],
@@ -266,6 +282,13 @@ function pauseWhenHidden() {
 </script>
 
 <style scoped>
+.map-current-year {
+  flex: 0 0 120px;
+  width: 120px;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
 /* The viewport less the app bar, step bar and page title, so the panels fit
    a laptop screen. A minimum, so the plot's column can grow to fit it. */
 .map-flex {

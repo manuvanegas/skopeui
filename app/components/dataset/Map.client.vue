@@ -7,6 +7,9 @@
     @step-ready="emit('stepReady', $event)"
     @step-error="emit('stepError', $event)"
   >
+    <template v-if="$slots['header-end']" #header-end>
+      <slot name="header-end" />
+    </template>
     <template v-if="$slots.footer" #footer><slot name="footer" /></template>
   </MapLibre>
 </template>
