@@ -47,6 +47,9 @@ const mocks = vi.hoisted(() => {
     numberOfCells: 0,
     areaInSquareKm: 0,
     geoJson: null,
+    get hasGeoJson() {
+      return this.geoJson !== null;
+    },
   } as any;
 
   const studyArea = {
@@ -81,6 +84,7 @@ const mocks = vi.hoisted(() => {
     });
     fitBounds = vi.fn();
     remove = vi.fn();
+    resize = vi.fn();
     setLayoutProperty = vi.fn((id: string, property: string, value: string) => {
       const layer = this.style.layers.find((entry) => entry.id === id);
       if (!layer) return;
@@ -159,6 +163,9 @@ const mocks = vi.hoisted(() => {
     geomanInstance,
     mapInstances,
     MockMap,
+    download: vi.fn(),
+    messageError: vi.fn(),
+    removeAttribution: vi.fn(),
   };
 });
 
@@ -172,7 +179,7 @@ vi.mock("@/stores/dataset", () => ({
 
 vi.mock("@/stores/messages", () => ({
   useMessagesStore: () => ({
-    error: vi.fn(),
+    error: mocks.messageError,
     info: vi.fn(),
     dismiss: vi.fn(),
   }),
@@ -185,6 +192,14 @@ vi.mock("@/composables/useStudyArea", () => ({
 vi.mock("maplibre-gl", () => ({
   Map: mocks.MockMap,
   NavigationControl: class MockNavigationControl {},
+  AttributionControl: class MockAttributionControl {
+    onAdd() {
+      const element = document.createElement("div");
+      element.textContent = "Map credits";
+      return element;
+    }
+    onRemove = mocks.removeAttribution;
+  },
   ScaleControl: class MockScaleControl {},
   setWorkerUrl: vi.fn(),
 }));
@@ -227,6 +242,9 @@ const uiStubs = {
 describe("MapLibre", () => {
   beforeEach(() => {
     vi.stubGlobal("useRoute", () => mocks.routeState);
+    vi.stubGlobal("useNuxtApp", () => ({
+      $download: { saveAs: mocks.download },
+    }));
     vi.stubGlobal("useRuntimeConfig", () => ({
       public: {
         apiBase: "https://test.example.com",
@@ -246,6 +264,33 @@ describe("MapLibre", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.clearAllMocks();
+  });
+
+  it("[behavior] keeps credits below the map and detaches them on navigation", async () => {
+    let resize!: () => void;
+    const disconnect = vi.fn();
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe = vi.fn();
+        disconnect = disconnect;
+        constructor(callback: () => void) {
+          resize = callback;
+        }
+      },
+    );
+    const wrapper = mount(MapLibre, { global: { stubs: uiStubs } });
+    await flushPromises();
+    expect(wrapper.get(".map-attribution").text()).toBe("Map credits");
+    expect(wrapper.get(".map-frame").text()).not.toContain("Map credits");
+    const map = mocks.mapInstances[0];
+    resize();
+    expect(map.resize).toHaveBeenCalledOnce();
+    wrapper.unmount();
+    resize();
+    expect(map.resize).toHaveBeenCalledOnce();
+    expect(disconnect).toHaveBeenCalledOnce();
+    expect(mocks.removeAttribution).toHaveBeenCalledOnce();
   });
 
   it("[behavior] discards drawing tools that finish loading after navigation", async () => {
@@ -378,6 +423,7 @@ describe("MapLibre", () => {
 
     // No colormap or rescale: the key is padded, and nothing follows it.
     const source = mocks.mapInstances[0].getStyle().sources["cog-source-a"];
+    expect(source.tileSize).toBe(256);
     expect(source.tiles[0]).toBe(
       "https://test.example.com/tiles/paleocar/ppt_annual/0590/{z}/{x}/{y}",
     );
@@ -460,6 +506,87 @@ describe("MapLibre", () => {
     expect(wrapper.emitted("stepError")).toEqual([[103]]);
     expect(wrapper.emitted("stepReady")).toBeUndefined();
     expect(map.eventHandlers.render).toEqual([]);
+    wrapper.unmount();
+  });
+
+  it("[behavior] preloads without advancing, then reuses the buffer at the deadline", async () => {
+    const wrapper = mount(MapLibre, {
+      global: { stubs: uiStubs },
+      props: { step: 103 },
+    });
+    await flushPromises();
+    const map = mocks.mapInstances[0];
+    const render = () =>
+      [...map.eventHandlers.render].forEach((fn: Function) => fn());
+    render();
+    render();
+    await wrapper.setProps({ preloadStep: 104 });
+    const buffer = map.getStyle().sources["cog-source-b"];
+    expect(buffer.tiles[0]).toContain("/0104/");
+    render();
+    render();
+    expect(wrapper.emitted("stepReady")).toEqual([[103]]);
+    expect(map.setPaintProperty).not.toHaveBeenCalled();
+    await wrapper.setProps({ step: 104, preloadStep: null });
+    expect(map.getStyle().sources["cog-source-b"]).toBe(buffer);
+    map.isSourceLoaded.mockReturnValue(false);
+    render();
+    expect(map.getSource("cog-source-a")).toBeDefined();
+    expect(wrapper.emitted("stepReady")).toEqual([[103]]);
+    map.isSourceLoaded.mockReturnValue(true);
+    render();
+    render();
+    expect(wrapper.emitted("stepReady")).toEqual([[103], [104]]);
+    await wrapper.setProps({ preloadStep: 106 });
+    expect(map.getStyle().sources["cog-source-a"].tiles[0]).toContain("/0106/");
+    await wrapper.setProps({ preloadStep: null });
+    expect(map.getSource("cog-source-a")).toBeUndefined();
+    expect(map.getSource("cog-source-b")).toBeDefined();
+    wrapper.unmount();
+  });
+
+  it("[behavior] retries a failed preload when requested without interrupting playback", async () => {
+    const wrapper = mount(MapLibre, {
+      global: { stubs: uiStubs },
+      props: { step: 103 },
+    });
+    await flushPromises();
+    const map = mocks.mapInstances[0];
+    const render = () =>
+      [...map.eventHandlers.render].forEach((fn: Function) => fn());
+    render();
+    render();
+    await wrapper.setProps({ preloadStep: 104 });
+    map.eventHandlers.error.forEach((fn: Function) =>
+      fn({ sourceId: "cog-source-b" }),
+    );
+    expect(wrapper.emitted("stepError")).toBeUndefined();
+    expect(map.getSource("cog-source-b")).toBeUndefined();
+    await wrapper.setProps({ step: 104, preloadStep: null });
+    expect(map.getStyle().sources["cog-source-b"].tiles[0]).toContain("/0104/");
+    render();
+    render();
+    expect(wrapper.emitted("stepReady")).toEqual([[103], [104]]);
+    wrapper.unmount();
+  });
+
+  it("[behavior] discards lookahead when manually selecting a different year", async () => {
+    const wrapper = mount(MapLibre, {
+      global: { stubs: uiStubs },
+      props: { step: 103 },
+    });
+    await flushPromises();
+    const map = mocks.mapInstances[0];
+    const render = () =>
+      [...map.eventHandlers.render].forEach((fn: Function) => fn());
+    render();
+    render();
+    await wrapper.setProps({ preloadStep: 104 });
+    await wrapper.setProps({ step: 106, preloadStep: null });
+    expect(map.getStyle().sources["cog-source-b"].tiles[0]).toContain("/0106/");
+    render();
+    render();
+    expect(wrapper.emitted("stepReady")).toEqual([[103], [106]]);
     wrapper.unmount();
   });
 
@@ -671,6 +798,121 @@ describe("MapLibre", () => {
       geometry: { type: "Point", coordinates: [-108.5, 37] },
     } as any;
     expect(await downloadDisabled()).toBeUndefined();
+  });
+
+  it("[behavior] downloads the shape from the button's activation handler", async () => {
+    mocks.datasetStore.geoJson = {
+      type: "Point",
+      coordinates: [-108, 37],
+    };
+    const wrapper = mount(MapLibre, { global: { stubs: uiStubs } });
+    await wrapper
+      .findAll("button")
+      .find((b) => b.text() === "Download GeoJSON")!
+      .trigger("click");
+    expect(mocks.download).toHaveBeenCalledWith(
+      expect.any(Blob),
+      "paleocar.geojson",
+    );
+    expect(wrapper.find("button a").exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it.each(["{}", "not JSON"])(
+    "[behavior] preserves the selected area after invalid upload: %s",
+    async (text) => {
+      const area = { type: "Point", coordinates: [-108, 37] };
+      mocks.datasetStore.geoJson = area;
+      const wrapper = mount(MapLibre, { global: { stubs: uiStubs } });
+      const input = wrapper.get<HTMLInputElement>("#loadGeoJsonFile");
+      Object.defineProperty(input.element, "files", {
+        value: [{ text: async () => text }],
+      });
+      await input.trigger("change");
+      await flushPromises();
+      expect(mocks.studyArea.save).not.toHaveBeenCalled();
+      expect(mocks.datasetStore.geoJson).toBe(area);
+      expect(mocks.messageError).toHaveBeenCalledWith(
+        expect.stringContaining("Your current selection has been kept."),
+      );
+      wrapper.unmount();
+    },
+  );
+
+  it("[behavior] reports file read failures without replacing the selection", async () => {
+    const wrapper = mount(MapLibre, { global: { stubs: uiStubs } });
+    const input = wrapper.get<HTMLInputElement>("#loadGeoJsonFile");
+    Object.defineProperty(input.element, "files", {
+      value: [
+        {
+          text: async () => {
+            throw new Error("File unavailable");
+          },
+        },
+      ],
+    });
+    await input.trigger("change");
+    await flushPromises();
+    expect(mocks.studyArea.save).not.toHaveBeenCalled();
+    expect(mocks.messageError).toHaveBeenCalledWith(
+      expect.stringContaining("Unable to import"),
+    );
+    wrapper.unmount();
+  });
+
+  it.each(["navigation", "unmount", "newer upload"])(
+    "[behavior] discards an upload that finishes after %s",
+    async (interruption) => {
+      let finishReading!: (text: string) => void;
+      const wrapper = mount(MapLibre, { global: { stubs: uiStubs } });
+      const input = wrapper.get<HTMLInputElement>("#loadGeoJsonFile");
+      Object.defineProperty(input.element, "files", {
+        configurable: true,
+        value: [
+          {
+            text: () =>
+              new Promise<string>((resolve) => {
+                finishReading = resolve;
+              }),
+          },
+        ],
+      });
+      await input.trigger("change");
+      if (interruption === "navigation")
+        mocks.routeState.params.id = "another_dataset";
+      else if (interruption === "unmount") wrapper.unmount();
+      else {
+        Object.defineProperty(input.element, "files", {
+          value: [{ text: async () => "{}" }],
+        });
+        await input.trigger("change");
+        await flushPromises();
+        mocks.messageError.mockClear();
+      }
+      finishReading('{"type":"Point","coordinates":[-108,37]}');
+      await flushPromises();
+      expect(mocks.studyArea.save).not.toHaveBeenCalled();
+      expect(mocks.messageError).not.toHaveBeenCalled();
+      if (interruption !== "unmount") wrapper.unmount();
+    },
+  );
+
+  it("[behavior] imports one normalized feature", async () => {
+    const wrapper = mount(MapLibre, { global: { stubs: uiStubs } });
+    const input = wrapper.get<HTMLInputElement>("#loadGeoJsonFile");
+    const geometry = { type: "Point", coordinates: [-108, 37] };
+    Object.defineProperty(input.element, "files", {
+      value: [{ text: async () => JSON.stringify(geometry) }],
+    });
+    await input.trigger("change");
+    await flushPromises();
+    expect(mocks.studyArea.save).toHaveBeenCalledWith({
+      type: "Feature",
+      properties: {},
+      geometry,
+    });
+    expect(input.element.value).toBe("");
+    wrapper.unmount();
   });
 
   it("[behavior] zooms to a point shape without zooming all the way in", async () => {

@@ -1,6 +1,10 @@
 <template>
   <v-container fluid class="fill-height">
-    <LoadingSpinner v-if="isLoadingMetadata" />
+    <DatasetLoadState
+      v-if="metadataState !== 'ready'"
+      :state="metadataState"
+      @retry="loadMetadata"
+    />
     <template v-else>
       <SubHeader>
         <v-btn
@@ -52,11 +56,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import LoadingSpinner from "@/components/LoadingSpinner.vue";
+import { ref, computed, watch, onMounted } from "vue";
+import DatasetLoadState from "@/components/dataset/DatasetLoadState.vue";
 import SubHeader from "@/components/dataset/SubHeader.vue";
 import Map from "@/components/dataset/Map.client.vue";
-import { useDatasetMetadata } from "@/composables/useDatasetMetadata";
+import { useDatasetPage } from "@/composables/useDatasetPage";
 import { useStudyArea } from "@/composables/useStudyArea";
 import { useAppStore } from "@/stores/app";
 import { useDatasetStore } from "@/stores/dataset";
@@ -68,14 +72,20 @@ definePageMeta({
 });
 
 const route = useRoute();
-const metadataActions = useDatasetMetadata();
+const postedStudyArea = useState<unknown | null>(
+  `posted-study-area:${route.params.id}`,
+  () => useRequestEvent()?.context.postedStudyArea ?? null,
+);
+const importedStudyArea = ref(false);
+const { state: metadataState, load: loadMetadata } = useDatasetPage(
+  String(route.params.id),
+);
 const studyArea = useStudyArea();
 const appStore = useAppStore();
 const datasetStore = useDatasetStore();
 
-const shouldConfirmGeometry = ref(true);
+const shouldConfirmGeometry = ref(false);
 
-const isLoadingMetadata = computed(() => datasetStore.metadata == null);
 const metadata = computed(() => datasetStore.metadata);
 const hasValidStudyArea = computed(() => datasetStore.hasGeoJson);
 const isFirstVisit = computed(() => appStore.isFirstVisit);
@@ -103,14 +113,23 @@ const visualizeLocation = computed(() => {
   };
 });
 
-await useAsyncData(
-  `dataset-${route.params.id}`,
-  async () => {
-    await metadataActions.initializeDataset(route.params.id as string);
-    return true;
-  },
-  { server: false },
-);
+await useAsyncData(`dataset-${route.params.id}`, loadMetadata, {
+  server: false,
+});
+
+onMounted(() => {
+  watch(
+    metadataState,
+    (state) => {
+      if (state === "ready" && postedStudyArea.value) {
+        studyArea.save(postedStudyArea.value);
+        postedStudyArea.value = null;
+        importedStudyArea.value = true;
+      }
+    },
+    { immediate: true },
+  );
+});
 
 useHead(() => ({
   title: metadata.value?.title || "SKOPE",
@@ -126,7 +145,8 @@ function clearGeometry() {
 }
 
 function mapLoaded(_value: boolean) {
-  shouldConfirmGeometry.value = hasValidStudyArea.value;
+  shouldConfirmGeometry.value =
+    hasValidStudyArea.value && !importedStudyArea.value;
 }
 
 function keepGeometry() {

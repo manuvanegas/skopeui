@@ -1,8 +1,19 @@
 <template>
   <v-container fluid class="fill-height align-start">
-    <LoadingSpinner v-if="isLoadingMetadata" />
+    <DatasetLoadState
+      v-if="metadataState !== 'ready'"
+      :state="metadataState"
+      @retry="initializePage"
+    />
     <template v-else>
       <SubHeader :select-variable="true">
+        <v-btn
+          v-if="canRetryTimeSeries"
+          variant="outlined"
+          @click="retryTimeSeries"
+        >
+          Retry time series
+        </v-btn>
         <v-btn
           :to="editAreaLocation"
           variant="outlined"
@@ -31,6 +42,7 @@
         >
           <Map
             :step="requestedStep"
+            :preload-step="preloadStep"
             :display-raster="true"
             @step-ready="frameReady"
             @step-error="frameFailed"
@@ -74,14 +86,14 @@ import Map from "@/components/dataset/Map.client.vue";
 import RasterPlaybackControls from "@/components/dataset/RasterPlaybackControls.vue";
 import TimeSeriesPlot from "@/components/dataset/TimeSeriesPlot.vue";
 import SubHeader from "@/components/dataset/SubHeader.vue";
-import LoadingSpinner from "@/components/LoadingSpinner.vue";
+import DatasetLoadState from "@/components/dataset/DatasetLoadState.vue";
 import { axisYears } from "@/utils/timeAxis";
 import { useRasterPlayback } from "@/composables/useRasterPlayback";
 import { useAppStore } from "@/stores/app";
 import { useDatasetStore } from "@/stores/dataset";
 import { useMessagesStore } from "@/stores/messages";
 import { useTimeSeriesRequest } from "@/composables/useTimeSeriesRequest";
-import { useDatasetMetadata } from "@/composables/useDatasetMetadata";
+import { useDatasetPage } from "@/composables/useDatasetPage";
 import { useStudyArea } from "@/composables/useStudyArea";
 
 definePageMeta({
@@ -95,7 +107,10 @@ const workflowDatasetId = String(route.params.id);
 const appStore = useAppStore();
 const datasetStore = useDatasetStore();
 const messageStore = useMessagesStore();
-const metadataActions = useDatasetMetadata();
+const { state: metadataState, load: loadMetadata } = useDatasetPage(
+  String(route.params.id),
+  route.params.variable as string,
+);
 const studyArea = useStudyArea();
 const { run: requestTimeSeries } = useTimeSeriesRequest("visualize");
 
@@ -107,6 +122,7 @@ const playbackRange = computed(
 );
 const {
   requestedStep,
+  preloadStep,
   displayedStep: stepSelected,
   isPlaying,
   isLoading: isStepLoading,
@@ -159,7 +175,13 @@ const analyzeLocation = computed(() => {
   if (!id || !variable) return undefined;
   return { name: "dataset-id-analyze-variable", params: { id, variable } };
 });
-const isLoadingMetadata = computed(() => datasetStore.metadata == null);
+const canRetryTimeSeries = computed(
+  () =>
+    datasetStore.canHandleTimeSeriesRequest &&
+    ["servererror", "timeout"].includes(
+      datasetStore.timeSeriesRequestStatus.status,
+    ),
+);
 const traces = computed(() => {
   const ts = datasetStore.timeseriesTrace;
   if (!ts) return [];
@@ -184,24 +206,28 @@ async function loadTimeSeries() {
   }
 }
 
+async function retryTimeSeries() {
+  if (!canRetryTimeSeries.value) return;
+  await loadTimeSeries();
+}
+
+async function initializePage() {
+  if (!(await loadMetadata())) return false;
+  const savedStep = datasetStore.visualizeStep;
+  selectStep(
+    savedStep != null &&
+      savedStep >= datasetStore.temporalRangeMin &&
+      savedStep <= datasetStore.temporalRangeMax &&
+      playbackYears.value.includes(savedStep)
+      ? savedStep
+      : datasetStore.temporalRangeMin,
+  );
+  return true;
+}
+
 await useAsyncData(
   `visualize-${route.params.id}-${route.params.variable}`,
-  async () => {
-    await metadataActions.initializeDataset(
-      route.params.id as string,
-      route.params.variable as string,
-    );
-    const savedStep = datasetStore.visualizeStep;
-    selectStep(
-      savedStep != null &&
-        savedStep >= datasetStore.temporalRangeMin &&
-        savedStep <= datasetStore.temporalRangeMax &&
-        playbackYears.value.includes(savedStep)
-        ? savedStep
-        : datasetStore.temporalRangeMin,
-    );
-    return true;
-  },
+  initializePage,
   { server: false },
 );
 
@@ -244,6 +270,14 @@ function pauseWhenHidden() {
    a laptop screen. A minimum, so the plot's column can grow to fit it. */
 .map-flex {
   min-height: calc(100vh - 250px);
+}
+
+@media (min-width: 1200px) {
+  .map-flex {
+    /* Field + validation + padding + border: match the plot's natural height. */
+    --panel-header-min-height: 93px;
+    --panel-header-align: flex-start;
+  }
 }
 
 @media all and (max-width: 960px) {

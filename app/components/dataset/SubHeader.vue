@@ -1,14 +1,15 @@
 <template>
   <v-row align="center" justify="space-between" class="sub-header">
     <v-col md="6" sm="9" cols="12" class="d-flex align-center ga-1">
-      <span class="text-h6">
+      <h1 class="text-h6 dataset-heading">
         {{ metadata?.title }}
-      </span>
+      </h1>
       <MetadataModal v-if="metadata" :metadata-id="metadata.id" />
       <v-btn
         icon
         size="x-small"
         href="https://www.openskope.org/skope-users-guide/"
+        aria-label="SKOPE user guide (opens in a new tab)"
         target="_blank"
       >
         <v-icon>mdi-help-circle-outline</v-icon>
@@ -67,6 +68,10 @@ const variable = computed({
 </script>
 
 <style scoped>
+.dataset-heading {
+  font: inherit;
+}
+
 .sub-header-actions {
   display: flex;
   flex-wrap: wrap;

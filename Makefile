@@ -1,5 +1,6 @@
 ENVIRONMENT ?= dev
 COMPOSE_PROJECT_NAME ?= skope-ui
+PULL ?= 1
 
 API_URL_dev := http://localhost:8001
 API_URL_staging := https://staging-api.openskope.org
@@ -36,6 +37,7 @@ help: ##- Show available targets
 	@sed -e '/#\{2\}-/!d; s/\\$$//; s/:[^#\t]*/:/; s/#\{2\}- *//' $(MAKEFILE_LIST)
 
 check-environment:
+	@case "$(PULL)" in 0|1) ;; *) echo 'PULL must be 0 or 1' >&2; exit 2;; esac
 	@case "$(ENVIRONMENT)" in \
 	  dev|staging|prod) ;; \
 	  *) echo "ENVIRONMENT must be dev, staging, or prod (got '$(ENVIRONMENT)')" 1>&2; exit 2;; \
@@ -55,14 +57,14 @@ config: check-environment ##- Render and validate the selected Compose configura
 
 build: check-environment citations ##- Build the selected environment's image
 	@$(COMPOSE) config --quiet
-	$(COMPOSE) build --pull
+	$(COMPOSE) build $(if $(filter 1,$(PULL)),--pull)
 
 # Backwards-compatible alias used by existing CI and deployment notes.
 buildprod: override ENVIRONMENT=prod
 buildprod: build
 
 deploy: build ##- Deploy ENVIRONMENT (defaults to dev) and wait for a healthy service
-	$(COMPOSE) up -d --remove-orphans --wait --wait-timeout 120
+	$(COMPOSE) up -d --remove-orphans $(if $(filter dev,$(ENVIRONMENT)),--force-recreate --renew-anon-volumes) --wait --wait-timeout 120
 
 deploy-dev: override ENVIRONMENT=dev
 deploy-dev: deploy ##- Build and deploy the local development environment

@@ -36,11 +36,11 @@
           size="small"
           color="secondary"
           variant="flat"
-          :disabled="!datasetStore.geoJson"
+          :disabled="!datasetStore.hasGeoJson"
           prepend-icon="mdi-download"
           @click="exportSelectedGeometry"
         >
-          <a id="exportSelectedGeometry">Download GeoJSON</a>
+          Download GeoJSON
         </v-btn>
       </div>
     </PanelHeader>
@@ -67,9 +67,7 @@
               aria-label="Base map"
               data-test="basemap-button"
             >
-              <v-icon size="18">
-                mdi-layers-outline
-              </v-icon>
+              <v-icon size="18"> mdi-layers-outline </v-icon>
             </button>
           </template>
           <v-list density="compact">
@@ -88,6 +86,7 @@
       </Teleport>
       <div v-if="isStepLoading" class="map-step-loading">
         <v-progress-circular
+          aria-label="Loading map"
           indeterminate
           color="primary"
           size="48"
@@ -95,6 +94,7 @@
         />
       </div>
     </v-card-text>
+    <div ref="attributionContainer" class="map-attribution" />
     <slot name="footer" />
   </v-card>
 </template>
@@ -113,6 +113,7 @@ import { useStudyArea } from "@/composables/useStudyArea";
 import { useAppStore } from "@/stores/app";
 import { useDatasetStore } from "@/stores/dataset";
 import { useMessagesStore } from "@/stores/messages";
+import { parseImportedStudyArea } from "@/utils/studyArea";
 import { getBasemaps, DEFAULT_BASEMAP_ID } from "@/utils/maplibre/basemaps";
 import { createMapScene } from "@/utils/maplibre/scene";
 import { createRasterController } from "@/utils/maplibre/raster";
@@ -125,6 +126,7 @@ import {
 
 const props = defineProps({
   step: { type: Number, default: 2000 },
+  preloadStep: { type: [Number, null], default: null },
   displayRaster: { type: Boolean, default: true },
 });
 const emit = defineEmits(["mapReady", "stepReady", "stepError"]);
@@ -133,6 +135,7 @@ const appStore = useAppStore();
 const datasetStore = useDatasetStore();
 const messageStore = useMessagesStore();
 const studyArea = useStudyArea();
+const { $download } = useNuxtApp();
 const runtimeConfig = useRuntimeConfig();
 const endpoints = createApiEndpoints(runtimeConfig.public.apiBase);
 const mapBaseLayers = getBasemaps(runtimeConfig.public);
@@ -140,6 +143,7 @@ const defaultBaseLayer = mapBaseLayers.find(
   (layer) => layer.id === DEFAULT_BASEMAP_ID,
 );
 const mapContainer = ref<HTMLElement | null>(null);
+const attributionContainer = ref<HTMLElement | null>(null);
 const isStepLoading = ref(false);
 const metadata = computed(() => datasetStore.metadata);
 const currentStep = computed(() =>
@@ -206,6 +210,7 @@ const drawing = createStudyAreaController({
   },
 });
 const scene = createMapScene({
+  attributionContainer: () => attributionContainer.value,
   baseLayers: mapBaseLayers,
   metadata: () => metadata.value,
   selectedBaseLayerId: () => selectedBaseLayerId.value,
@@ -235,17 +240,35 @@ function getCogBaseUrl(): string | null {
   return `${endpoints.tiles}/${datasetId}/${varId}`;
 }
 
-function loadGeoJson(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0];
+let importSequence = 0;
+let disposed = false;
+
+async function loadGeoJson(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
   if (!file) return;
-  file.text().then((text) => {
+  input.value = "";
+  const sequence = ++importSequence;
+  const datasetId = route.params.id;
+  const isCurrent = () =>
+    !disposed && sequence === importSequence && route.params.id === datasetId;
+  try {
+    const text = await file.text();
+    if (!isCurrent()) return;
+    let data: unknown;
     try {
-      const geoJsonData = JSON.parse(text);
-      studyArea.save(geoJsonData);
+      data = JSON.parse(text);
     } catch {
-      alert("Sorry, we couldn't import this GeoJSON file.");
+      throw new Error("The file is not valid JSON. Choose a GeoJSON file.");
     }
-  });
+    const feature = parseImportedStudyArea(data);
+    studyArea.save(feature);
+  } catch (error) {
+    if (!isCurrent()) return;
+    messageStore.error(
+      `Unable to import the study area. ${error instanceof Error ? error.message : "The file could not be read. Please choose it again."} Your current selection has been kept.`,
+    );
+  }
 }
 
 function selectGeoJsonFile() {
@@ -253,16 +276,13 @@ function selectGeoJsonFile() {
 }
 
 function exportSelectedGeometry() {
-  const gJ = datasetStore.geoJson as any;
-  if (!gJ) return;
-
-  const convertedArea =
-    "text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(gJ));
-  const button = document.getElementById("exportSelectedGeometry");
-  if (!button) return;
-
-  button.setAttribute("href", "data:" + convertedArea);
-  button.setAttribute("download", `${metadata.value?.id}.geojson`);
+  if (!datasetStore.hasGeoJson) return;
+  $download.saveAs(
+    new Blob([JSON.stringify(datasetStore.geoJson)], {
+      type: "application/geo+json;charset=utf-8",
+    }),
+    `${metadata.value?.id}.geojson`,
+  );
 }
 
 onMounted(() => {
@@ -270,7 +290,10 @@ onMounted(() => {
   setWorkerUrl(mapWorkerUrl);
   scene.mount(mapContainer.value);
 });
-onUnmounted(() => scene.dispose());
+onUnmounted(() => {
+  disposed = true;
+  scene.dispose();
+});
 watch(
   () => datasetStore.geoJson,
   (geometry) => drawing.updateGeometry(geometry),
@@ -282,8 +305,12 @@ watch(
 );
 watch(selectedBaseLayerId, (id) => scene.selectBaseLayer(id));
 watch(
-  () => props.step,
-  (step) => raster.updateStep(step),
+  () => [props.step, props.preloadStep] as const,
+  ([step, preloadStep], [previousStep]) => {
+    // Commit first so clearing lookahead cannot discard the requested buffer.
+    if (step !== previousStep) raster.updateStep(step);
+    raster.preloadStep(preloadStep);
+  },
 );
 watch(legendOptions, (options) => raster.updateLegend(options));
 watch(legendVisible, (visible) => raster.setLegendVisible(visible));
@@ -291,11 +318,6 @@ watch(cogBaseUrl, () => raster.reset(props.step));
 </script>
 
 <style scoped>
-#exportSelectedGeometry {
-  text-decoration: none;
-  color: inherit;
-}
-
 .map-card {
   display: flex;
   flex-direction: column;
@@ -376,7 +398,12 @@ watch(cogBaseUrl, () => raster.reset(props.step));
   }
 
   .map-frame {
-    min-height: 380px;
+    min-height: 480px;
+  }
+
+  :deep(.maplibregl-ctrl-group button) {
+    width: 44px;
+    height: 44px;
   }
 }
 
@@ -384,8 +411,24 @@ watch(cogBaseUrl, () => raster.reset(props.step));
   margin-top: 8px;
 }
 
-:deep(.mapboxgl-ctrl-draw-btn) {
-  min-width: 28px;
+.map-attribution {
+  flex: 0 0 auto;
+  padding: 0 16px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.map-attribution :deep(.maplibregl-ctrl-attrib) {
+  margin: 0;
+  float: none;
+  padding: 0;
+  background: transparent;
+  overflow-wrap: anywhere;
+}
+
+.map-attribution :deep(a) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 :deep(.skope-colorbar) {

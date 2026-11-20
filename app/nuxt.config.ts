@@ -27,6 +27,7 @@ export default defineNuxtConfig({
   app: {
     head: {
       title: "skopeui",
+      htmlAttrs: { lang: "en" },
       meta: [
         { charset: "utf-8" },
         { name: "viewport", content: "width=device-width, initial-scale=1" },
@@ -60,10 +61,14 @@ export default defineNuxtConfig({
     },
     public: {
       apiBase: "http://localhost:8001",
+      // A Sentry DSN is a public ingestion address, not an account credential.
+      sentryDsn:
+        process.env.NUXT_SENTRY_DSN ||
+        "https://9b9dc2f60562380edeb675c39fe1c896@sentry.comses.net/4",
       gtagId: process.env.NUXT_PUBLIC_GTAG_ID || "G-M0NVBT90BT",
       cartoApiKey: "",
       stadiaApiKey: "",
-      stadiaDomainAuth: false,
+      stadiaDomainAuth: true,
     },
   },
 
@@ -84,11 +89,16 @@ export default defineNuxtConfig({
     // Keep Nuxt useLayout distinct from Vuetify useVLayout.
     moduleOptions: { prefixComposables: true },
     vuetifyOptions: {
+      // Eager tooltip roots expose empty tooltip roles while their content is
+      // hidden. Mount the overlay when opened and remove it after closing.
+      defaults: { VTooltip: { eager: false } },
       theme: {
         defaultTheme: "light",
         themes: {
           light: {
             colors: THEME_COLORS,
+            // Keep small labels and hints legible on filled and white fields.
+            variables: { "medium-emphasis-opacity": 0.75 },
           },
         },
       },
@@ -96,6 +106,29 @@ export default defineNuxtConfig({
   },
 
   vite: {
+    // Routes and client-only components hide some imports from the initial scan.
+    // Bundle them up front so exploring pages or reporting a bug doesn't reload.
+    optimizeDeps: {
+      include: [
+        "@geoman-io/maplibre-geoman-free",
+        "@sentry/nuxt",
+        "@turf/turf",
+        "@vue/devtools-core",
+        "@vueuse/core",
+        "ajv/dist/2020",
+        "file-saver",
+        "jszip",
+        "maplibre-gl",
+        "markdown-it",
+        "markdown-it-attrs",
+        "markdown-it-div",
+        "mathjs",
+        "papaparse",
+        "plotly.js/lib/core",
+        "plotly.js/lib/scatter",
+        "sanitize-html",
+      ],
+    },
     build: {
       cssMinify: "lightningcss",
     },

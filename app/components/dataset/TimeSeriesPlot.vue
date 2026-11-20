@@ -1,23 +1,26 @@
 <template>
-  <v-card variant="outlined" class="time-series-card">
-    <PanelHeader>
+  <v-card
+    variant="outlined"
+    class="time-series-card"
+    :class="{ 'time-series-card--compact': compactPlot }"
+  >
+    <PanelHeader class="time-series-header">
       <AreaReadout v-if="showArea" />
       <v-form
         ref="temporalRangeForm"
         v-model="isTemporalRangeValid"
         class="time-series-range"
-        @click="enableTemporalRangeEdit"
+        @focusin="emit('pause-playback')"
         @submit.prevent="setTemporalRange"
       >
         <v-text-field
-          v-model.number="formTemporalRangeMin"
+          v-model.number="localTemporalRangeMin"
           class="time-series-range-field"
           label="From"
           density="compact"
           variant="outlined"
           :hide-details="false"
           validate-on="blur"
-          :disabled="!isTemporalRangeEditable"
           :min="minStep"
           :max="maxStep - 1"
           type="number"
@@ -25,14 +28,13 @@
           @keydown.enter.prevent="setTemporalRange"
         />
         <v-text-field
-          v-model.number="formTemporalRangeMax"
+          v-model.number="localTemporalRangeMax"
           class="time-series-range-field"
           label="To"
           density="compact"
           variant="outlined"
           :hide-details="false"
           validate-on="blur"
-          :disabled="!isTemporalRangeEditable"
           :min="minStep + 1"
           :max="maxStep"
           :rules="[validateMaxStep]"
@@ -96,18 +98,19 @@
       </v-text-field>
     </PanelHeader>
 
-    <div class="time-series-plot-shell">
+    <div ref="plotShell" class="time-series-plot-shell">
       <div
         v-if="timeSeriesRequestStatus.status === 'loading'"
         class="timeseries-loading-overlay"
       >
         <v-progress-circular
+          aria-label="Loading time series"
           indeterminate
           color="primary"
           size="52"
           width="4"
         />
-        <p class="loading-message mt-4">{{ loadingMessage }}</p>
+        <p role="status" class="loading-message mt-4">{{ loadingMessage }}</p>
       </div>
       <client-only placeholder="Loading...">
         <template
@@ -154,12 +157,13 @@ import {
   defineAsyncComponent,
 } from "vue";
 import type { VForm } from "vuetify/components";
+import { useElementSize } from "@vueuse/core";
 import type { PlotImageApi, ExportTrace } from "@/types/plot";
 import type { Annotation, Layout, Config, Shape } from "plotly.js";
 import AreaReadout from "@/components/dataset/AreaReadout.vue";
 import PanelHeader from "@/components/dataset/PanelHeader.vue";
 import { useDatasetStore } from "@/stores/dataset";
-import { wrapPlotTitle } from "@/utils/plotTitle";
+import { wrapPlotTitle, wrapPlotLabel } from "@/utils/plotTitle";
 import { PLOT_COLORS } from "@/utils/colors";
 import {
   axisYears,
@@ -190,11 +194,15 @@ const Plotly = defineAsyncComponent(
 );
 
 const datasetStore = useDatasetStore();
+const plotShell = ref<HTMLElement | null>(null);
+const { width: plotWidth } = useElementSize(plotShell);
+const compactPlot = computed(
+  () => plotWidth.value > 0 && plotWidth.value < 480,
+);
 
 // Local state
 const localTemporalRangeMin = ref(1);
 const localTemporalRangeMax = ref(new Date().getFullYear());
-const isTemporalRangeEditable = ref(false);
 const isTemporalRangeValid = ref(false);
 const temporalRangeForm = ref<InstanceType<typeof VForm> | null>(null);
 let plotImageApi: PlotImageApi | null = null;
@@ -259,28 +267,6 @@ const canHandleTimeSeriesRequest = computed(
   () => datasetStore.canHandleTimeSeriesRequest,
 );
 
-const formTemporalRangeMin = computed({
-  get() {
-    return isTemporalRangeEditable.value
-      ? localTemporalRangeMin.value
-      : selectedTemporalRange.value[0];
-  },
-  set(value: number) {
-    localTemporalRangeMin.value = value;
-  },
-});
-
-const formTemporalRangeMax = computed({
-  get() {
-    return isTemporalRangeEditable.value
-      ? localTemporalRangeMax.value
-      : selectedTemporalRange.value[1];
-  },
-  set(value: number) {
-    localTemporalRangeMax.value = value;
-  },
-});
-
 const hasTemporalRangeChanges = computed(
   () =>
     localTemporalRangeMin.value !== selectedTemporalRange.value[0] ||
@@ -338,6 +324,7 @@ const AXIS_TITLE_SIZE = 14;
 const Y_TITLE_LINE_HEIGHT = 20;
 const MARGIN_LEFT = Y_TICK_LABELS_WIDTH + 2 * Y_TITLE_LINE_HEIGHT + 4;
 const MARGIN_RIGHT = 80;
+const COMPACT_TOOLBAR_HEIGHT = 104;
 // The longest title kept on one line. It fits the plot's minimum height
 // (.time-series), and longer titles wrap in two halves that do too.
 const Y_TITLE_MAX_LINE_LENGTH = 44;
@@ -359,11 +346,43 @@ const yAxisTitleAnnotation = computed<Partial<Annotation>>(() => ({
   showarrow: false,
 }));
 
+const compactTitle = computed(() =>
+  wrapPlotLabel(
+    yAxisTitle.value ?? "",
+    Math.max(18, Math.floor(plotWidth.value / 8)),
+  ),
+);
+
 const layoutMetadata = computed<Partial<Layout>>(() => ({
   autosize: true,
-  margin: { l: MARGIN_LEFT, r: MARGIN_RIGHT, b: 60, t: 10, pad: 2 },
+  margin: compactPlot.value
+    ? {
+        l: 48,
+        r: 12,
+        b: 52,
+        t:
+          COMPACT_TOOLBAR_HEIGHT +
+          compactTitle.value.split("<br>").length * 20 +
+          (hasMultipleTimeSeries.value ? 56 : 24),
+        pad: 2,
+      }
+    : { l: MARGIN_LEFT, r: MARGIN_RIGHT, b: 60, t: 10, pad: 2 },
+  title: compactPlot.value
+    ? {
+        text: compactTitle.value,
+        font: { size: AXIS_TITLE_SIZE },
+        x: 0.5,
+        xanchor: "center",
+        y: 0.98,
+        yanchor: "top",
+        pad: { t: COMPACT_TOOLBAR_HEIGHT },
+        automargin: true,
+      }
+    : undefined,
   showlegend: hasMultipleTimeSeries.value,
-  legend: { x: 1, y: 0.5 },
+  legend: compactPlot.value
+    ? { orientation: "h", x: 0, y: 1.02, xanchor: "left", yanchor: "bottom" }
+    : { x: 1, y: 0.5 },
   xaxis: {
     title: { text: temporalLabels.value.axis, font: { size: AXIS_TITLE_SIZE } },
     range: [temporalRangeMin.value, temporalRangeMax.value],
@@ -373,40 +392,41 @@ const layoutMetadata = computed<Partial<Layout>>(() => ({
     linewidth: 3,
     gridwidth: 3,
     automargin: true,
+    ...(compactPlot.value ? { nticks: 4, tickangle: 0 } : {}),
   },
   yaxis: {
     linewidth: 3,
     gridwidth: 3,
+    automargin: compactPlot.value,
   },
   font: { size: 14 },
   // In trace order: the first series, then Smoothed.
   colorway: [PLOT_COLORS.main, PLOT_COLORS.plotAccent],
-  annotations: [yAxisTitleAnnotation.value],
+  annotations: compactPlot.value ? [] : [yAxisTitleAnnotation.value],
 }));
 
 const options = computed<Partial<Config>>(() => ({
   displaylogo: false,
+  displayModeBar: compactPlot.value ? true : "hover",
   modeBarButtonsToRemove: ["toImage"],
 }));
 
 // Methods
-function enableTemporalRangeEdit() {
-  emit("pause-playback");
-  if (isTemporalRangeEditable.value) return;
-  localTemporalRangeMin.value = selectedTemporalRange.value[0];
-  localTemporalRangeMax.value = selectedTemporalRange.value[1];
-  isTemporalRangeEditable.value = true;
-}
-
 function validateMinStep(value: number) {
+  if (!Number.isInteger(value)) return "Enter a whole year.";
   if (value < minStep.value) return `Use ${minStep.value} or later.`;
   if (value >= maxStep.value) return `Use a year before ${maxStep.value}.`;
+  if (value > localTemporalRangeMax.value)
+    return "From must be no later than To.";
   return true;
 }
 
 function validateMaxStep(value: number) {
+  if (!Number.isInteger(value)) return "Enter a whole year.";
   if (value <= minStep.value) return `Use a year after ${minStep.value}.`;
   if (value > maxStep.value) return `Use ${maxStep.value} or earlier.`;
+  if (value < localTemporalRangeMin.value)
+    return "To must be no earlier than From.";
   return true;
 }
 
@@ -430,7 +450,6 @@ async function setTemporalRange() {
     localTemporalRangeMin.value,
     localTemporalRangeMax.value,
   ];
-  isTemporalRangeEditable.value = false;
   if (props.stepSelected == null) return;
   if (props.stepSelected < temporalRangeMin.value)
     setStep(temporalRangeMin.value);
@@ -439,7 +458,7 @@ async function setTemporalRange() {
 }
 
 function resetTemporalRange() {
-  enableTemporalRangeEdit();
+  emit("pause-playback");
   localTemporalRangeMin.value = datasetStore.minYear;
   localTemporalRangeMax.value = datasetStore.maxYear;
   setTemporalRange();
@@ -542,7 +561,6 @@ onMounted(() => {
   if (draft && draft.range[0] === min && draft.range[1] === max) {
     localTemporalRangeMin.value = draft.min;
     localTemporalRangeMax.value = draft.max;
-    isTemporalRangeEditable.value = true;
   } else {
     localTemporalRangeMin.value = min;
     localTemporalRangeMax.value = max;
@@ -550,14 +568,13 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  datasetStore.temporalRangeDraft =
-    isTemporalRangeEditable.value && hasTemporalRangeChanges.value
-      ? {
-          range: [...selectedTemporalRange.value],
-          min: localTemporalRangeMin.value,
-          max: localTemporalRangeMax.value,
-        }
-      : null;
+  datasetStore.temporalRangeDraft = hasTemporalRangeChanges.value
+    ? {
+        range: [...selectedTemporalRange.value],
+        min: localTemporalRangeMin.value,
+        max: localTemporalRangeMax.value,
+      }
+    : null;
 });
 
 watch(
@@ -578,11 +595,9 @@ watch(
       selectedTemporalRange.value = [nextMin, nextMax];
     }
 
-    // Keep form inputs in sync unless the user is actively editing.
-    if (!isTemporalRangeEditable.value) {
-      localTemporalRangeMin.value = selectedTemporalRange.value[0];
-      localTemporalRangeMax.value = selectedTemporalRange.value[1];
-    }
+    // An externally applied interval supersedes any unsubmitted draft.
+    localTemporalRangeMin.value = selectedTemporalRange.value[0];
+    localTemporalRangeMax.value = selectedTemporalRange.value[1];
   },
   { immediate: true },
 );
@@ -596,6 +611,59 @@ watch(
   flex-direction: column;
   width: 100%;
   min-width: 0;
+}
+
+/* The always-visible narrow toolbar gets its own band above the value title. */
+.time-series-card--compact {
+  --plot-min-height: 520px;
+}
+
+.time-series-card--compact .js-plotly-plot .plotly .modebar {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  right: 0;
+}
+
+.time-series-card--compact .js-plotly-plot .plotly .modebar-group {
+  display: contents;
+}
+
+.time-series-card--compact .js-plotly-plot .plotly .modebar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+}
+
+.time-series-card--compact .js-plotly-plot .plotly .modebar-btn svg {
+  position: static;
+}
+
+.time-series-card--compact .js-plotly-plot .plotly .modebar-btn path {
+  /* Plotly assigns translucent fills inline; keep persistent tools legible. */
+  fill: rgb(var(--v-theme-muted)) !important;
+}
+
+.time-series-card--compact .js-plotly-plot .plotly .modebar-btn.active path {
+  fill: rgb(var(--v-theme-primary)) !important;
+}
+
+.time-series-card .js-plotly-plot .plotly .modebar:focus-within,
+.time-series-card .js-plotly-plot .plotly .modebar:focus-within .modebar-group {
+  opacity: 1;
+}
+
+.time-series-card .js-plotly-plot .plotly .modebar-btn:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: -2px;
+}
+
+/* Align controls at their inputs; the fields reserve validation space below. */
+.time-series-card > .panel-header.time-series-header {
+  align-items: flex-start;
 }
 
 .time-series-range {
@@ -704,6 +772,12 @@ watch(
 }
 
 @media (max-width: 599px) {
+  .time-series-range-field {
+    flex: 1 1 calc(50% - 4px);
+    width: auto;
+    min-width: 0;
+  }
+
   .time-series-range > .v-btn {
     min-width: 44px;
     min-height: 44px;
