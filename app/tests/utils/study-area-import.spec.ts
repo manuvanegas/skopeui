@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseImportedStudyArea } from "@/utils/studyArea";
+import savedRequest from "@/tests/fixtures/saved-analysis-multipolygon.json";
+import { parseSavedAnalysis } from "@/utils/savedAnalysis";
 
 const point = { type: "Point", coordinates: [-108, 37] };
 const ring = [
@@ -9,9 +11,10 @@ const ring = [
   [-109, 36],
 ];
 const polygon = { type: "Polygon", coordinates: [ring] };
+const multipolygon = { type: "MultiPolygon", coordinates: [[ring], [ring]] };
 
 describe("study-area imports", () => {
-  it.each([point, polygon])(
+  it.each([point, polygon, multipolygon])(
     "wraps a valid %j geometry as one feature",
     (geometry) => {
       expect(parseImportedStudyArea(geometry)).toEqual({
@@ -21,6 +24,51 @@ describe("study-area imports", () => {
       });
     },
   );
+
+  it("accepts the companion study-area.geojson from a downloaded analysis", () => {
+    expect(parseImportedStudyArea(savedRequest.selected_area)).toEqual(
+      savedRequest.selected_area,
+    );
+  });
+
+  it.each([point, polygon, multipolygon])(
+    "uses the same geometry rules for saved requests and GeoJSON uploads: %j",
+    (geometry) => {
+      const feature = { type: "Feature", properties: {}, geometry };
+      for (const area of [
+        feature,
+        { type: "FeatureCollection", features: [feature] },
+      ]) {
+        expect(
+          parseSavedAnalysis({ ...savedRequest, selected_area: area })
+            .selected_area,
+        ).toEqual(area);
+        expect(parseImportedStudyArea(area)).toEqual(feature);
+      }
+    },
+  );
+
+  it.each([
+    { type: "Point", coordinates: [181, 0] },
+    {
+      type: "Polygon",
+      coordinates: [
+        [
+          [0, 0],
+          [0, 0],
+          [0, 0],
+          [0, 0],
+        ],
+      ],
+    },
+    { type: "MultiPolygon", coordinates: [[ring], [ring.slice(0, 3)]] },
+  ])("rejects invalid geometry through both entry points: %j", (geometry) => {
+    const area = { type: "Feature", properties: {}, geometry };
+    expect(() => parseImportedStudyArea(area)).toThrow();
+    expect(() =>
+      parseSavedAnalysis({ ...savedRequest, selected_area: area }),
+    ).toThrow();
+  });
 
   it("preserves feature metadata and unwraps a one-feature collection", () => {
     const feature = {
@@ -86,6 +134,24 @@ describe("study-area imports", () => {
     { type: "Polygon", coordinates: [ring.slice(0, 3)] },
     { type: "Polygon", coordinates: [[...ring.slice(0, 3), [-110, 36]]] },
     { type: "Polygon", coordinates: [ring, []] },
+    { type: "MultiPolygon", coordinates: [] },
+    { type: "MultiPolygon", coordinates: [[ring], []] },
+    { type: "MultiPolygon", coordinates: [[ring], [ring.slice(0, 3)]] },
+    { type: "MultiPolygon", coordinates: [[ring], [ring, []]] },
+    {
+      type: "MultiPolygon",
+      coordinates: [
+        [ring],
+        [
+          [
+            [0, 0],
+            [1, 0],
+            [181, 1],
+            [0, 0],
+          ],
+        ],
+      ],
+    },
     {
       type: "Polygon",
       coordinates: [

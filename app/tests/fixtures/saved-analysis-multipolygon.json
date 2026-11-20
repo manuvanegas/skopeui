@@ -1,0 +1,55 @@
+{
+  "dataset_id": "paleocar_v3",
+  "variable_id": "ppt_annual",
+  "selected_area": {
+    "type": "Feature",
+    "properties": {
+      "__gm_id": "feature-3",
+      "__gm_shape": "polygon"
+    },
+    "geometry": {
+      "type": "MultiPolygon",
+      "coordinates": [
+        [
+          [
+            [-108.98436403841578, 38.93594489645267],
+            [-109.08754696966449, 38.80671228707672],
+            [-108.89015353597168, 38.73675902705432],
+            [-108.59854959983477, 38.799720048279625],
+            [-108.98436403841578, 38.93594489645267]
+          ]
+        ]
+      ]
+    },
+    "id": "feature-3"
+  },
+  "time_range": {
+    "gte": "0600-01-01",
+    "lte": "0900-01-01"
+  },
+  "zonal_statistic": "mean",
+  "transform": {
+    "type": "ZScoreFixedInterval",
+    "time_range": {
+      "gte": "0600-01-01",
+      "lte": "0900-01-01"
+    }
+  },
+  "requested_series_options": [
+    {
+      "name": "Transformed",
+      "smoother": {
+        "type": "NoSmoother"
+      }
+    },
+    {
+      "name": "Smoothed",
+      "smoother": {
+        "type": "MovingAverageSmoother",
+        "method": "centered",
+        "width": 11
+      }
+    }
+  ],
+  "max_processing_time": 20000
+}

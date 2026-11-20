@@ -175,6 +175,22 @@ describe("route /dataset/:id/analyze/:variable", () => {
     );
   });
 
+  it("[behavior] preserves a saved processing budget when initializing the page", async () => {
+    analysisStore.requestData = {
+      ...datasetStore.defaultApiRequestData,
+      transform: { type: "NoTransform" },
+      max_processing_time: 1234,
+    };
+    const wrapper = await mountWithSuspense(AnalyzePage, {
+      global: { stubs: layoutStubs },
+    });
+    await flushPromises();
+    expect(analysisStore.setDefaultRequestData).toHaveBeenCalledWith(
+      expect.objectContaining({ max_processing_time: 1234 }),
+    );
+    wrapper.unmount();
+  });
+
   it("[behavior] enables Download only after the current result and plot are ready", async () => {
     let finish!: (value: unknown) => void;
     extractionStore.resolveTimeSeries.mockImplementationOnce(

@@ -15,9 +15,13 @@ export function parseImportedStudyArea(value: unknown): unknown {
   const geometry = feature.type === "Feature" ? feature.geometry : feature;
   if (
     !record(geometry) ||
-    (geometry.type !== "Point" && geometry.type !== "Polygon")
+    (geometry.type !== "Point" &&
+      geometry.type !== "Polygon" &&
+      geometry.type !== "MultiPolygon")
   )
-    throw new Error("The study area must be one point or polygon.");
+    throw new Error(
+      "The study area must be one point, polygon, or multipolygon feature.",
+    );
 
   const position = (entry: unknown): entry is number[] =>
     Array.isArray(entry) &&
@@ -35,22 +39,32 @@ export function parseImportedStudyArea(value: unknown): unknown {
         "Use valid longitude (−180 to 180) and latitude (−90 to 90) coordinates.",
       );
   } else {
-    const rings = geometry.coordinates;
-    if (!Array.isArray(rings) || rings.length === 0)
+    const polygons =
+      geometry.type === "MultiPolygon"
+        ? geometry.coordinates
+        : [geometry.coordinates];
+    if (!Array.isArray(polygons) || polygons.length === 0)
       throw new Error("The study polygon must not be empty.");
-    for (const ring of rings) {
-      if (!Array.isArray(ring) || ring.length < 4 || !ring.every(position))
-        throw new Error(
-          "Each polygon ring needs at least four valid longitude/latitude positions.",
-        );
-      if (JSON.stringify(ring[0]) !== JSON.stringify(ring[ring.length - 1]))
-        throw new Error("Each polygon ring must end at its starting position.");
-      if (
-        new Set(ring.map((point) => JSON.stringify(point.slice(0, 2)))).size < 3
-      )
-        throw new Error(
-          "Each polygon ring needs at least three distinct positions.",
-        );
+    for (const rings of polygons) {
+      if (!Array.isArray(rings) || rings.length === 0)
+        throw new Error("The study polygon must not be empty.");
+      for (const ring of rings) {
+        if (!Array.isArray(ring) || ring.length < 4 || !ring.every(position))
+          throw new Error(
+            "Each polygon ring needs at least four valid longitude/latitude positions.",
+          );
+        if (JSON.stringify(ring[0]) !== JSON.stringify(ring[ring.length - 1]))
+          throw new Error(
+            "Each polygon ring must end at its starting position.",
+          );
+        if (
+          new Set(ring.map((point) => JSON.stringify(point.slice(0, 2)))).size <
+          3
+        )
+          throw new Error(
+            "Each polygon ring needs at least three distinct positions.",
+          );
+      }
     }
   }
   return feature.type === "Feature"

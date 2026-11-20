@@ -43,6 +43,8 @@ export function useSavedAnalysis() {
     ]);
     // Importing does not overwrite the dataset's persisted study area.
     dataset.setGeoJson(request.selected_area);
+    // A file is an explicit replacement for edits left in this analysis form.
+    delete analysis.formDrafts[`${request.dataset_id}:${request.variable_id}`];
     analysis.setRequestData(request);
     return request;
   }

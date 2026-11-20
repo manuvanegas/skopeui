@@ -401,6 +401,8 @@ function initializeRequestData() {
     incoming.zonal_statistic = existing.zonal_statistic;
   if (existing?.requested_series_options)
     incoming.requested_series_options = existing.requested_series_options;
+  if (existing?.max_processing_time != null)
+    incoming.max_processing_time = existing.max_processing_time;
   analysisStore.setDefaultRequestData(incoming);
   return incoming;
 }

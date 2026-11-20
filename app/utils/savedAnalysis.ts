@@ -5,6 +5,7 @@ import type { SavedAnalysisRequest } from "@/types/api";
 import type { Dataset } from "@/types/metadata";
 import { defaultAnalysisOptions } from "@/types/api";
 import { axisYears, timeSpan } from "@/utils/timeAxis";
+import { parseImportedStudyArea } from "@/utils/studyArea";
 
 // OpenAPI's discriminator is an annotation here; oneOf enforces the variants.
 const validate = new Ajv2020({
@@ -102,15 +103,6 @@ function rangeYears(range: TimeRange): [number, number] {
   return bounds;
 }
 
-function singleGeometry(area: TimeseriesRequest["selected_area"]) {
-  if (area.type === "FeatureCollection") {
-    if (area.features.length !== 1)
-      invalid("Select exactly one study feature.");
-    return area.features[0]!.geometry;
-  }
-  return area.type === "Feature" ? area.geometry : area;
-}
-
 export function parseSavedAnalysis(input: unknown): SavedAnalysisRequest {
   const request = parseTimeseriesRequest(input);
   if (!request.time_range)
@@ -121,20 +113,11 @@ export function parseSavedAnalysis(input: unknown): SavedAnalysisRequest {
     request.transform.time_range
   )
     rangeYears(request.transform.time_range);
-  const geometry = singleGeometry(request.selected_area);
-  if (!geometry || (geometry.type !== "Point" && geometry.type !== "Polygon"))
-    invalid("The study area must be one point or polygon.");
-  if (geometry.type === "Polygon") {
-    if (!geometry.coordinates.length) invalid("The study polygon is empty.");
-    for (const ring of geometry.coordinates) {
-      if (
-        ring.length < 4 ||
-        JSON.stringify(ring[0]) !== JSON.stringify(ring[ring.length - 1])
-      )
-        invalid(
-          "Each polygon ring must be closed and contain at least four positions.",
-        );
-    }
+  try {
+    // Use the GeoJSON upload rules while preserving the exported wrapper.
+    parseImportedStudyArea(request.selected_area);
+  } catch (error) {
+    invalid((error as Error).message);
   }
   const names = new Set<string>();
   for (const option of request.requested_series_options) {

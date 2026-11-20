@@ -9,6 +9,7 @@ import {
   validateSavedAnalysisDataset,
 } from "@/utils/savedAnalysis";
 import metadata from "@/tests/fixtures/metadata-1.0.0.json";
+import multipolygonRequest from "@/tests/fixtures/saved-analysis-multipolygon.json";
 import type { Dataset } from "@/types/metadata";
 
 const savedRequest = {
@@ -22,7 +23,10 @@ const dataset = metadata.datasets[0] as Dataset;
 describe("time-series contract", () => {
   it("keeps generated request and result types synchronized with the backend schema snapshot", async () => {
     expect(
-      readFileSync(resolve(import.meta.dirname, "../../types/timeseries.ts"), "utf8"),
+      readFileSync(
+        resolve(import.meta.dirname, "../../types/timeseries.ts"),
+        "utf8",
+      ),
     ).toBe(await generateTimeseriesTypes());
   });
 
@@ -47,6 +51,30 @@ describe("time-series contract", () => {
     parsed.selected_area.type = "Polygon" as any;
     expect(input.selected_area.type).toBe("Point");
   });
+
+  it("accepts multiple polygon parts in one saved study feature", () => {
+    const input = structuredClone(multipolygonRequest);
+    input.selected_area.geometry.coordinates.push(
+      structuredClone(input.selected_area.geometry.coordinates[0]!),
+    );
+    expect(parseSavedAnalysis(input)).toEqual(input);
+  });
+
+  it.each(["empty geometry", "empty polygon", "open second polygon"])(
+    "rejects an invalid MultiPolygon: %s",
+    (description) => {
+      const input = structuredClone(multipolygonRequest);
+      const coordinates = input.selected_area.geometry.coordinates;
+      if (description === "empty geometry") coordinates.length = 0;
+      else if (description === "empty polygon") coordinates.push([]);
+      else {
+        const polygon = structuredClone(coordinates[0]!);
+        polygon[0]!.pop();
+        coordinates.push(polygon);
+      }
+      expect(() => parseSavedAnalysis(input)).toThrow(/polygon/);
+    },
+  );
 
   it.each([
     ["null", null],

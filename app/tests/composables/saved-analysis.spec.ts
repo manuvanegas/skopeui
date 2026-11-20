@@ -5,7 +5,21 @@ import { useDatasetStore } from "@/stores/dataset";
 import { useMetadataStore } from "@/stores/metadata";
 import { useAnalysisStore } from "@/stores/analysis";
 import metadataFixture from "@/tests/fixtures/metadata-1.0.0.json";
+import multipolygonRequest from "@/tests/fixtures/saved-analysis-multipolygon.json";
 import type { Dataset } from "@/types/metadata";
+import {
+  defaultAnalysisForm,
+  analysisFormFromRequest,
+  analysisOptionsFromForm,
+  TRANSFORM_OPTIONS,
+  SMOOTHING_OPTIONS,
+} from "@/utils/analysisOptions";
+import { captureAnalysisExport } from "@/utils/analysisExport";
+import { parseTimeseriesRequest } from "@/utils/savedAnalysis";
+import { parseImportedStudyArea } from "@/utils/studyArea";
+import { extractionGeometry } from "@/utils/extractionIdentity";
+import { timeSeriesResponseFixture } from "@/tests/fixtures/page-fixtures";
+import type { SavedAnalysisRequest } from "@/types/api";
 
 const request = {
   dataset_id: "paleocar_v3",
@@ -31,6 +45,101 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("saved analysis restoration", () => {
+  const geometry = multipolygonRequest.selected_area.geometry;
+  const shapes = [
+    { name: "point", area: request.selected_area },
+    {
+      name: "polygon",
+      area: { type: "Polygon", coordinates: geometry.coordinates[0] },
+    },
+    { name: "multipolygon", area: multipolygonRequest.selected_area },
+  ];
+  const cases = shapes.flatMap((shape) =>
+    TRANSFORM_OPTIONS.flatMap((transform) =>
+      SMOOTHING_OPTIONS.flatMap((smoothing) =>
+        [false, true].map((existing) => ({
+          ...shape,
+          transform: transform.id,
+          smoothing: smoothing.id,
+          existing,
+        })),
+      ),
+    ),
+  );
+
+  it.each(cases)(
+    "round trips $name / $transform / $smoothing (existing session: $existing)",
+    async ({ area, transform, smoothing, existing }) => {
+      const form = {
+        ...defaultAnalysisForm(),
+        transformOption: transform,
+        smoothingOption: smoothing,
+        timeRange: { lb: { year: 700, month: 1 }, ub: { year: 800, month: 1 } },
+      };
+      const original = parseTimeseriesRequest({
+        ...multipolygonRequest,
+        selected_area: area,
+        ...analysisOptionsFromForm(form, [600, 900]),
+        max_processing_time: 1234,
+      }) as SavedAnalysisRequest;
+      const snapshot = captureAnalysisExport(
+        original,
+        timeSeriesResponseFixture,
+      );
+      const file = JSON.parse(JSON.stringify(snapshot.request));
+      const analysis = useAnalysisStore();
+      const dataset = useDatasetStore();
+      if (existing) {
+        dataset.setMetadata(metadataFixture.datasets[0] as Dataset);
+        dataset.setVariable(request.variable_id);
+        dataset.setGeoJson(request.selected_area);
+        dataset.setTemporalRange([1500, 1600]);
+        analysis.setRequestData(parseTimeseriesRequest(request));
+        analysis.formDrafts[`${original.dataset_id}:${original.variable_id}`] =
+          {
+            ...defaultAnalysisForm(),
+            smoothingTimeStep: 31,
+          };
+      }
+      await useSavedAnalysis().restore(file);
+      expect(analysis.requestData).toEqual(original);
+      expect(analysis.formDrafts).not.toHaveProperty(
+        `${original.dataset_id}:${original.variable_id}`,
+      );
+      const restoredForm = analysisFormFromRequest(
+        defaultAnalysisForm(),
+        original,
+      );
+      expect(
+        analysisOptionsFromForm(restoredForm, dataset.temporalRange),
+      ).toEqual(analysisOptionsFromForm(form, [600, 900]));
+      expect(
+        extractionGeometry(parseImportedStudyArea(file.selected_area)),
+      ).toEqual(extractionGeometry(dataset.geoJson));
+    },
+  );
+
+  it("restores a downloaded MultiPolygon analysis without changing its geometry or options", async () => {
+    await useSavedAnalysis().restore(multipolygonRequest);
+    expect(useAnalysisStore().requestData).toEqual(multipolygonRequest);
+    expect(useDatasetStore().hasGeoJson).toBe(true);
+    expect(useDatasetStore().temporalRange).toEqual([600, 900]);
+  });
+
+  it("discards the imported analysis's stale form draft while preserving other drafts", async () => {
+    const analysis = useAnalysisStore();
+    const key = `${multipolygonRequest.dataset_id}:${multipolygonRequest.variable_id}`;
+    analysis.formDrafts[key] = {
+      ...defaultAnalysisForm(),
+      smoothingTimeStep: 31,
+    };
+    analysis.formDrafts.other = defaultAnalysisForm();
+    await useSavedAnalysis().restore(multipolygonRequest);
+    expect(analysis.formDrafts).not.toHaveProperty(key);
+    expect(analysis.formDrafts.other).toEqual(defaultAnalysisForm());
+    expect(analysis.requestData).toEqual(multipolygonRequest);
+  });
+
   it("restores dataset, variable, range, geometry and options without overwriting the saved area", async () => {
     const previousArea = { type: "Point", coordinates: [0, 0] };
     localStorage.setItem("geojson:paleocar_v3", JSON.stringify(previousArea));
@@ -126,6 +235,8 @@ describe("saved analysis restoration", () => {
     dataset.setTemporalRange([1700, 1800]);
     const analysis = useAnalysisStore();
     analysis.setRequestData({ zonal_statistic: "median" });
+    analysis.formDrafts[`${request.dataset_id}:${request.variable_id}`] =
+      defaultAnalysisForm();
     const catalog = useMetadataStore();
     catalog.setAllDatasetMetadata(metadataFixture.datasets as Dataset[]);
     const snapshot = () =>
